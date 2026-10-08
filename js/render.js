@@ -1,4 +1,4 @@
-// gravity-melee :: rendering — baked pixel planet/moon, HUD, menus
+// gravity-melee :: rendering — baked pixel planet/moon, camera-space HUD, menus
 (function (GM) {
   const { U } = GM;
   const R = { planetCv: null, moonCv: null };
@@ -17,7 +17,6 @@
     const cv = document.createElement('canvas');
     cv.width = d; cv.height = d;
     const g = cv.getContext('2d');
-    // craters seeded deterministically
     const craters = [];
     let seed = 7;
     const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
@@ -37,7 +36,6 @@
           if (cd < c.r) v -= (c.r - cd) * 0.9;
           else if (cd < c.r + 1) v += 0.6;
         }
-        // limb darkening + top-left light
         const light = (dx * -0.5 + dy * -0.7) / (r || 1);
         v += light * 1.4 + (dist / r - 0.5) * 1.8;
         const idx = U.clamp(Math.round((v + 4) / 8 * (ramp.length - 1)), 0, ramp.length - 1);
@@ -48,11 +46,12 @@
     return cv;
   }
 
-  // ---------- world drawing ----------
+  // ---------- world drawing (camera-space via U.eff) ----------
   R.drawWorld = (g, world, t) => {
     const P = GM.PHYS.planet;
     const M = GM.PHYS.moon;
     const mp = world.moonPos();
+    const e2 = U.eff(P.x, P.y);    // planet on screen
 
     GM.FX.drawStars(g, t);
 
@@ -61,85 +60,86 @@
     g.globalAlpha = 0.5;
     g.setLineDash([2, 5]);
     for (const rr of [P.knee, P.rInf]) {
-      g.beginPath(); g.arc(P.x, P.y, rr, 0, U.TAU); g.stroke();
+      g.beginPath(); g.arc(e2.x, e2.y, rr, 0, U.TAU); g.stroke();
     }
     g.setLineDash([]);
     // danger ring
     g.strokeStyle = world.surgeMult > 1.05 ? '#a03028' : '#4a2430';
-    g.globalAlpha = 0.5;
-    g.beginPath(); g.arc(P.x, P.y, P.r + 40, 0, U.TAU); g.stroke();
+    g.beginPath(); g.arc(e2.x, e2.y, P.r + 40, 0, U.TAU); g.stroke();
     g.globalAlpha = 1;
 
     // moon orbit path
     g.strokeStyle = '#1a2233';
     g.globalAlpha = 0.6;
-    g.beginPath(); g.arc(P.x, P.y, M.orbitR, 0, U.TAU); g.stroke();
+    g.beginPath(); g.arc(e2.x, e2.y, M.orbitR, 0, U.TAU); g.stroke();
     g.globalAlpha = 1;
 
     // planet glow (stronger with surge)
     const surgeGlow = world.surgeMult > 1.05;
     const glowR = P.r + 6 + Math.sin(t * 2) * 1.5 + (world.surgeMult - 1) * 4;
-    const grd = g.createRadialGradient(P.x, P.y, P.r * 0.6, P.x, P.y, glowR + 10);
+    const grd = g.createRadialGradient(e2.x, e2.y, P.r * 0.6, e2.x, e2.y, glowR + 10);
     grd.addColorStop(0, surgeGlow ? 'rgba(255,120,60,0.28)' : 'rgba(255,150,90,0.16)');
     grd.addColorStop(1, 'rgba(255,150,90,0)');
     g.fillStyle = grd;
-    g.beginPath(); g.arc(P.x, P.y, glowR + 10, 0, U.TAU); g.fill();
+    g.beginPath(); g.arc(e2.x, e2.y, glowR + 10, 0, U.TAU); g.fill();
 
     // planet body
-    g.drawImage(R.planetCv, (P.x - P.r) | 0, (P.y - P.r) | 0);
+    g.drawImage(R.planetCv, (e2.x - P.r) | 0, (e2.y - P.r) | 0);
 
     // surge pulses
     if (surgeGlow) {
       const k = (t * 0.8) % 1;
       g.strokeStyle = '#ff6a3a';
       g.globalAlpha = (1 - k) * 0.5;
-      g.beginPath(); g.arc(P.x, P.y, P.r + k * 90, 0, U.TAU); g.stroke();
+      g.beginPath(); g.arc(e2.x, e2.y, P.r + k * 90, 0, U.TAU); g.stroke();
       g.globalAlpha = 1;
     }
 
     // moon
-    g.drawImage(R.moonCv, (mp.x - M.r) | 0, (mp.y - M.r) | 0);
+    const em = U.eff(mp.x, mp.y);
+    g.drawImage(R.moonCv, (em.x - M.r) | 0, (em.y - M.r) | 0);
 
     // mines
     for (const s of world.ships) {
       for (const m of s.mines) {
-        const blink = Math.sin(m.t * 8) > 0;
-        g.fillStyle = s.team === (GM.humanShip ? GM.humanShip.team : -2)
-          ? GM.TEAMS[s.team].P : '#ffb04a';
+        const e = U.eff(m.x, m.y);
+        if (e.x < -4 || e.x > GM.VW + 4 || e.y < -4 || e.y > GM.VH + 4) continue;
         g.fillStyle = GM.TEAMS[s.team].P;
-        g.fillRect((m.x - 1) | 0, (m.y - 1) | 0, 3, 3);
-        if (m.armed && blink) {
+        g.fillRect((e.x - 1) | 0, (e.y - 1) | 0, 3, 3);
+        if (m.armed && Math.sin(m.t * 8) > 0) {
           g.fillStyle = '#fff';
-          g.fillRect(m.x | 0, m.y | 0, 1, 1);
+          g.fillRect(e.x | 0, e.y | 0, 1, 1);
         }
       }
     }
 
     // shots
     for (const sh of world.shots) {
-      g.fillStyle = sh.col;
+      const e = U.eff(sh.x, sh.y);
+      if (e.x < -8 || e.x > GM.VW + 8 || e.y < -8 || e.y > GM.VH + 8) continue;
       const sp = U.norm(sh.vx, sh.vy);
       const tl = Math.min(4, sh.size + 2);
-      g.fillRect((sh.x - sp.x * tl / 2 - sh.size / 2) | 0, (sh.y - sp.y * tl / 2 - sh.size / 2) | 0, sh.size, sh.size);
-      g.fillRect((sh.x + sp.x * tl / 2 - sh.size / 2) | 0, (sh.y + sp.y * tl / 2 - sh.size / 2) | 0, sh.size, sh.size);
+      g.fillStyle = sh.col;
+      g.fillRect((e.x - sp.x * tl / 2 - sh.size / 2) | 0, (e.y - sp.y * tl / 2 - sh.size / 2) | 0, sh.size, sh.size);
+      g.fillRect((e.x + sp.x * tl / 2 - sh.size / 2) | 0, (e.y + sp.y * tl / 2 - sh.size / 2) | 0, sh.size, sh.size);
     }
 
     // missiles
     for (const ms of world.missiles) {
+      const e = U.eff(ms.x, ms.y);
+      if (e.x < -8 || e.x > GM.VW + 8 || e.y < -8 || e.y > GM.VH + 8) continue;
       g.save();
-      g.translate(ms.x, ms.y);
+      g.translate(e.x, e.y);
       g.rotate(ms.ang + Math.PI / 2);
       g.fillStyle = '#e8e8f4';
       g.fillRect(-1, -3, 2, 5);
       g.fillStyle = GM.TEAMS[ms.team].P;
       g.fillRect(-1, -3, 2, 1);
-      // exhaust
       if (U.chance(0.6)) {
         g.fillStyle = '#ffb04a';
         g.fillRect(-1, 2, 2, 1 + (Math.random() * 2 | 0));
       }
       g.restore();
-      // smoke trail
       GM.FX.emit(ms.x, ms.y, 1, { spd: 6, life: 0.4, col: '#6a7080', size: 1 });
     }
 
@@ -151,148 +151,278 @@
 
     GM.FX.draw(g);
 
-    // screen flash
-    if (GM.FX.flash > 0.01) {
+    // lock brackets + offscreen arrows for the player's target
+    R.drawTargeting(g, world, t);
+
+    // screen flash (never during victory)
+    if (GM.FX.flash > 0.01 && GM.state !== 'victory') {
       g.globalAlpha = GM.FX.flash;
       g.fillStyle = '#fff';
-      g.fillRect(0, 0, GM.W, GM.H);
+      g.fillRect(0, 0, GM.VW, GM.VH);
       g.globalAlpha = 1;
     }
   };
 
+  // ---------- targeting visuals ----------
+  R.drawTargeting = (g, world, t) => {
+    const tgt = GM.humanTarget;
+    if (!tgt || tgt.dead) return;
+    const e = U.eff(tgt.x, tgt.y);
+    const r = tgt.r + 6;
+    const col = GM.TEAMS[tgt.team].P;
+    const onscreen = e.x > 4 && e.x < GM.VW - 4 && e.y > 4 && e.y < GM.VH - 4;
+    if (onscreen) {
+      g.strokeStyle = col;
+      g.globalAlpha = 0.9;
+      const bl = 4;
+      const corners = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+      for (const [sx, sy] of corners) {
+        g.beginPath();
+        g.moveTo(e.x + sx * r, e.y + sy * (r - bl));
+        g.lineTo(e.x + sx * r, e.y + sy * r);
+        g.lineTo(e.x + sx * (r - bl), e.y + sy * r);
+        g.stroke();
+      }
+      g.globalAlpha = 1;
+    } else {
+      // offscreen direction arrow at the viewport edge
+      const dx = e.x - GM.VW / 2, dy = e.y - GM.VH / 2;
+      const a = U.ang(dx, dy);
+      const m = 14;
+      const hx = GM.VW / 2 - m, hy = GM.VH / 2 - m;
+      const ca = Math.abs(Math.cos(a)) < 1e-9 ? 1e-9 : Math.abs(Math.cos(a));
+      const sa = Math.abs(Math.sin(a)) < 1e-9 ? 1e-9 : Math.abs(Math.sin(a));
+      const tx = Math.min(hx / ca, hy / sa);
+      const px = GM.VW / 2 + Math.cos(a) * tx;
+      const py = GM.VH / 2 + Math.sin(a) * tx;
+      g.save();
+      g.translate(px, py);
+      g.rotate(a);
+      g.fillStyle = col;
+      g.globalAlpha = 0.85;
+      g.beginPath();
+      g.moveTo(5, 0); g.lineTo(-3, -3); g.lineTo(-3, 3);
+      g.closePath();
+      g.fill();
+      g.restore();
+      g.globalAlpha = 1;
+    }
+  };
+
+  // ---------- AI debug ----------
   R.drawDebug = (g, world) => {
     g.font = '7px monospace';
     for (const s of world.ships) {
       if (s.dead || !s.aiBrain) continue;
       const b = s.aiBrain;
+      const e = U.eff(s.x, s.y);
+      if (e.x < -20 || e.x > GM.VW + 20 || e.y < -20 || e.y > GM.VH + 20) continue;
       if (b.tgt && !b.tgt.dead) {
-        const w = U.wrapDelta(s.x, s.y, b.tgt.x, b.tgt.y);
+        const te = U.eff(b.tgt.x, b.tgt.y);
         g.strokeStyle = GM.TEAMS[s.team].P;
         g.globalAlpha = 0.35;
         g.beginPath();
-        g.moveTo(s.x, s.y);
-        g.lineTo(s.x + w.x, s.y + w.y);
+        g.moveTo(e.x, e.y);
+        g.lineTo(te.x, te.y);
         g.stroke();
         g.globalAlpha = 1;
       }
       g.fillStyle = '#cfe0ff';
       g.textAlign = 'left';
-      g.fillText(b.mode + (b.los ? '' : ' !LOS'), s.x + 8, s.y - 6);
+      g.fillText(b.mode + (b.los ? '' : ' !LOS'), e.x + 8, e.y - 6);
     }
   };
 
   // ---------- HUD ----------
   R.drawHUD = (g, world) => {
-    const mode = world.mode;
-    const blocks = mode.teams.length;
+    const me = GM.humanShip;
+    const lockedBy = world.lockedOnMe(me);
 
-    g.font = 'bold 8px monospace';
-    g.textAlign = 'left';
-    const xs = blocks === 1 ? [GM.W / 2 - 55] : blocks === 2 ? [8, GM.W - 108] : [8, GM.W / 2 - 50, GM.W - 108];
-    world.teams.forEach((teamShips, ti) => {
-      const T = GM.TEAMS[ti];
-      const x0 = xs[ti];
+    // ===== PLAYER PANEL (upper left) =====
+    if (me && !me.dead) {
+      const T = GM.TEAMS[me.team];
+      g.font = 'bold 8px monospace';
+      g.textAlign = 'left';
       let y = 6;
       g.fillStyle = T.P;
-      g.fillRect(x0, y, 4, 4);
+      g.fillRect(8, y, 4, 4);
       g.fillStyle = '#cfe0ff';
-      g.fillText(T.name, x0 + 7, y + 4);
-      y += 8;
-      for (const s of teamShips) {
-        if (s.dead) {
-          g.fillStyle = '#3a4356';
-          g.fillRect(x0, y, 100, 3);
-          y += 5;
-          continue;
-        }
-        // crew bar
-        g.fillStyle = '#1a2030';
-        g.fillRect(x0, y, 100, 3);
-        g.fillStyle = s.crew / s.crewMax > 0.35 ? T.P : '#ff5648';
-        g.fillRect(x0, y, Math.round(100 * s.crew / s.crewMax), 3);
-        // battery bar
-        g.fillStyle = '#232c40';
-        g.fillRect(x0, y + 3, 100, 2);
-        g.fillStyle = '#ffd85e';
-        g.fillRect(x0, y + 3, Math.round(100 * s.batt / s.battMax), 2);
-        // markers (left blocks: after bars; right blocks: before bars to avoid clipping)
-        const mkX = x0 > GM.W / 2 ? x0 - 14 : x0 + 104;
-        if (s.human) {
-          g.fillStyle = '#fff';
-          g.fillText('◆', mkX, y + 3);
-        }
-        if (s.ai) {
-          g.fillStyle = '#7488a8';
-          g.fillText(s.ai.label.slice(0, 4).toUpperCase(), mkX, y + 3);
-        }
-        y += 9;
+      g.fillText(me.name.toUpperCase() + ' — ' + me.spec.name, 15, y + 4);
+      y += 9;
+      g.fillStyle = '#1a2030';
+      g.fillRect(8, y, 110, 4);
+      g.fillStyle = me.crew / me.crewMax > 0.35 ? T.P : '#ff5648';
+      g.fillRect(8, y, Math.round(110 * me.crew / me.crewMax), 4);
+      g.fillStyle = '#232c40';
+      g.fillRect(8, y + 5, 110, 3);
+      g.fillStyle = '#ffd85e';
+      g.fillRect(8, y + 5, Math.round(110 * me.batt / me.battMax), 3);
+      y += 12;
+      const sp = me.spec.special;
+      const ready = me.scd <= 0 && me.batt >= sp.cost;
+      g.fillStyle = ready ? '#8ef2ff' : '#5a6478';
+      g.fillText('SP ' + sp.label + (ready ? ' [READY]' : ''), 8, y + 4);
+      y += 10;
+      // target lock warning — subtle amber pulse (never fully invisible)
+      if (lockedBy.length) {
+        const pulse = 0.65 + 0.35 * Math.sin((GM.clockT || 0) * 5);
+        g.globalAlpha = pulse;
+        g.fillStyle = '#ffb04a';
+        g.fillText('⚠ LOCKED ×' + lockedBy.length, 8, y + 4);
+        g.globalAlpha = 1;
       }
-    });
+    } else {
+      g.font = 'bold 8px monospace';
+      g.textAlign = 'left';
+      g.fillStyle = '#7fd4ff';
+      g.fillText('[Q] take the helm of a ship', 8, GM.VH - 8);
+    }
 
-    // timer + surge state, top center
+    // ===== TARGET PANEL (upper right) =====
+    const tgt = GM.humanTarget;
+    if (tgt && !tgt.dead) {
+      const T = GM.TEAMS[tgt.team];
+      g.font = 'bold 8px monospace';
+      g.textAlign = 'right';
+      let y = 6;
+      g.fillStyle = T.P;
+      g.fillRect(GM.VW - 12, y, 4, 4);
+      g.fillStyle = '#cfe0ff';
+      g.fillText(tgt.name.toUpperCase() + ' — ' + tgt.spec.name, GM.VW - 15, y + 4);
+      y += 9;
+      g.fillStyle = '#1a2030';
+      g.fillRect(GM.VW - 118, y, 110, 4);
+      g.fillStyle = tgt.crew / tgt.crewMax > 0.35 ? T.P : '#ff5648';
+      g.fillRect(GM.VW - 118 + (110 - Math.round(110 * tgt.crew / tgt.crewMax)), y, Math.round(110 * tgt.crew / tgt.crewMax), 4);
+      g.fillStyle = '#232c40';
+      g.fillRect(GM.VW - 118, y + 5, 110, 3);
+      g.fillStyle = '#ffd85e';
+      g.fillRect(GM.VW - 118 + (110 - Math.round(110 * tgt.batt / tgt.battMax)), y + 5, Math.round(110 * tgt.batt / tgt.battMax), 3);
+      y += 12;
+      const me2 = GM.humanShip;
+      if (me2 && !me2.dead) {
+        const w = U.wrapDelta(me2.x, me2.y, tgt.x, tgt.y);
+        const dist = U.len(w.x, w.y);
+        const closing = -(w.x * tgt.vx + w.y * tgt.vy) / (dist || 1);
+        g.fillStyle = '#8fa2c0';
+        g.fillText('RNG ' + Math.round(dist) + '  CLOSING ' + closing.toFixed(1), GM.VW - 8, y + 4);
+      }
+    }
+
+    // ===== TEAM ROSTER (bottom left) =====
+    g.font = '8px monospace';
+    g.textAlign = 'left';
+    let ry = GM.VH - 8;
+    for (let ti = world.teams.length - 1; ti >= 0; ti--) {
+      const teamShips = world.teams[ti];
+      const T = GM.TEAMS[ti];
+      for (let i = teamShips.length - 1; i >= 0; i--) {
+        const s = teamShips[i];
+        ry -= 9;
+        g.fillStyle = s.dead ? '#39404f' : T.P;
+        g.fillRect(8, ry, 4, 4);
+        g.fillStyle = s.dead ? '#39404f' : '#8fa2c0';
+        g.fillText(s.name + (s.dead ? ' ✝' : ''), 15, ry + 4);
+      }
+      ry -= 3;
+    }
+
+    // ===== MINIMAP (bottom right) =====
+    R.drawMinimap(g, world);
+
+    // ===== TOP CENTER: timer / surge / mode =====
     const tm = Math.floor(world.time);
     const mm = String(Math.floor(tm / 60)).padStart(1, '0');
     const ss = String(tm % 60).padStart(2, '0');
     g.textAlign = 'center';
     g.font = 'bold 10px monospace';
     g.fillStyle = world.surgeMult > 1.05 ? '#ff7a4a' : '#8fa2c0';
-    g.fillText(mm + ':' + ss + (world.surgeMult > 1.05 ? '  SURGE ×' + world.surgeMult.toFixed(1) : ''), GM.W / 2, 14);
-
-    // bottom status line
+    g.fillText(mm + ':' + ss + (world.surgeMult > 1.05 ? '  SURGE ×' + world.surgeMult.toFixed(1) : ''), GM.VW / 2, 14);
     g.font = '8px monospace';
+    g.fillStyle = '#55688a';
+    g.fillText(world.mode.label, GM.VW / 2, 24);
+
+    // ===== BOTTOM status =====
     g.textAlign = 'right';
     g.fillStyle = '#55688a';
-    let st = 'SPD ×' + GM.speed + (GM.paused ? '  [PAUSED]' : '') + (GM.debugAI ? '  [AI]' : '');
-    g.fillText(st, GM.W - 6, GM.H - 6);
-    g.textAlign = 'left';
-    if (!GM.humanShip) {
-      g.fillStyle = '#7fd4ff';
-      g.fillText('[Q] take the helm of a ship', 6, GM.H - 6);
-    } else {
-      const s = GM.humanShip;
-      g.fillStyle = '#ffd85e';
-      g.fillText('HELM: ' + s.name + '  [' + s.spec.name + ']', 6, GM.H - 6);
-      // special readiness
-      const sp = s.spec.special;
-      const ready = s.scd <= 0 && s.batt >= sp.cost;
-      g.fillStyle = ready ? '#8ef2ff' : '#5a6478';
-      g.fillText('SP [' + sp.label + ']' + (ready ? ' READY' : ''), 6, GM.H - 16);
+    g.fillText('SPD ×' + GM.speed + (GM.paused ? '  [PAUSED]' : '') + (GM.debugAI ? '  [AI]' : ''), GM.VW - 6, GM.VH - 6);
+    if (me && !me.dead) {
+      g.textAlign = 'left';
+      g.fillStyle = '#7488a8';
+      g.fillText('[E] release helm  ·  [TAB] cycle target', 8, GM.VH - 6);
     }
     g.textAlign = 'left';
+  };
+
+  // ---------- minimap ----------
+  R.drawMinimap = (g, world) => {
+    const mw = 92, mh = 44;
+    const mx = GM.VW - mw - 6, my = GM.VH - mh - 10;
+    g.fillStyle = 'rgba(4,6,12,0.72)';
+    g.fillRect(mx, my, mw, mh);
+    g.strokeStyle = '#1b2438';
+    g.strokeRect(mx, my, mw, mh);
+    const sx = mw / GM.W, sy = mh / GM.H;
+    const P = GM.PHYS.planet;
+    g.fillStyle = '#b07a48';
+    g.fillRect(mx + P.x * sx - 1, my + P.y * sy - 1, 3, 3);
+    const mp = world.moonPos();
+    g.fillStyle = '#8b95ab';
+    g.fillRect(mx + mp.x * sx, my + mp.y * sy, 1, 1);
+    for (const s of world.ships) {
+      if (s.dead) continue;
+      g.fillStyle = s.human ? '#fff' : GM.TEAMS[s.team].P;
+      const px = mx + s.x * sx, py = my + s.y * sy;
+      g.fillRect(px - 1, py - 1, s.human ? 3 : 2, s.human ? 3 : 2);
+    }
+    const tgt = GM.humanTarget;
+    if (tgt && !tgt.dead) {
+      g.strokeStyle = GM.TEAMS[tgt.team].P;
+      g.globalAlpha = 0.6;
+      g.beginPath();
+      g.arc(mx + tgt.x * sx, my + tgt.y * sy, 3, 0, U.TAU);
+      g.stroke();
+      g.globalAlpha = 1;
+    }
+    const me = GM.humanShip;
+    if (me && !me.dead) {
+      g.strokeStyle = '#3fc8ff';
+      g.globalAlpha = 0.4;
+      g.strokeRect(mx + (me.x - GM.VW / 2) * sx, my + (me.y - GM.VH / 2) * sy, GM.VW * sx, GM.VH * sy);
+      g.globalAlpha =  me.globalAlpha = 1;
+    }
   };
 
   // ---------- screens ----------
   R.dim = (g, a) => {
     g.fillStyle = 'rgba(4,6,12,' + a + ')';
-    g.fillRect(0, 0, GM.W, GM.H);
+    g.fillRect(0, 0, GM.VW, GM.VH);
   };
 
   R.title = (g, t) => {
     R.dim(g, 0.55);
     g.textAlign = 'center';
-    // big blocky title
     g.font = 'bold 34px monospace';
     g.fillStyle = '#0a0e18';
-    g.fillText('GRAVITY MELEE', GM.W / 2 + 2, 84 + 2);
+    g.fillText('GRAVITY MELEE', GM.VW / 2 + 2, 86);
     g.fillStyle = '#7fd4ff';
-    g.fillText('GRAVITY MELEE', GM.W / 2, 84);
+    g.fillText('GRAVITY MELEE', GM.VW / 2, 84);
     g.font = '9px monospace';
     g.fillStyle = '#8fa2c0';
-    g.fillText('gravity-well space skirmishes — AI pilots duel, you take the helm when you dare', GM.W / 2, 100);
-
+    g.fillText('gravity-well space skirmishes — AI pilots duel, you take the helm when you dare', GM.VW / 2, 100);
     const blink = Math.sin(t * 3) > -0.3;
     if (blink) {
       g.font = 'bold 11px monospace';
       g.fillStyle = '#fff';
-      g.fillText('PRESS  1 · 2 · 3  TO START A MELEE', GM.W / 2, 150);
+      g.fillText('PRESS  1 · 2 · 3  TO START A MELEE', GM.VW / 2, 150);
     }
     g.font = '8px monospace';
     g.fillStyle = '#55688a';
-    g.fillText('[1] 1v1    [2] 2v2    [3] 3v3v3', GM.W / 2, 168);
-    g.fillText('Q take helm · WASD fly · SPACE fire · SHIFT special · TAB back to AI', GM.W / 2, 196);
-    g.fillText('G AI minds · P pause · M mute · -/= sim speed', GM.W / 2, 210);
+    g.fillText('[1] 1v1    [2] 2v2    [3] 3v3v3', GM.VW / 2, 168);
+    g.fillText('Q take helm · WASD fly · TAB cycle targets · SPACE fire · SHIFT special', GM.VW / 2, 196);
+    g.fillText('E release helm · G AI minds · P pause · M mute · -/= sim speed', GM.VW / 2, 210);
     g.fillStyle = '#3c4a66';
-    g.fillText('v' + GM.VERSION + ' — a love letter to Star Control II melee', GM.W / 2, GM.H - 14);
+    g.fillText('v' + GM.VERSION + ' — a love letter to Star Control II melee', GM.VW / 2, GM.VH - 14);
     g.textAlign = 'left';
   };
 
@@ -303,32 +433,30 @@
     if (world.winner === -1) {
       g.font = 'bold 26px monospace';
       g.fillStyle = '#ff9a5a';
-      g.fillText('MUTUAL DESTRUCTION', GM.W / 2, y0 + 10);
+      g.fillText('MUTUAL DESTRUCTION', GM.VW / 2, y0 + 10);
       g.font = '9px monospace';
       g.fillStyle = '#8fa2c0';
-      g.fillText('no survivors — the planet keeps its secrets', GM.W / 2, y0 + 28);
+      g.fillText('no survivors — the planet keeps its secrets', GM.VW / 2, y0 + 28);
     } else {
       const T = GM.TEAMS[world.winner];
       g.font = 'bold 26px monospace';
       g.fillStyle = T.P;
-      g.fillText(T.name + ' DOMINATES', GM.W / 2, y0 + 10);
-      // survivors
+      g.fillText(T.name + ' DOMINATES', GM.VW / 2, y0 + 10);
       g.font = '9px monospace';
       const surv = world.ships.filter((s) => !s.dead);
       g.fillStyle = '#cfe0ff';
-      g.fillText('survivors: ' + surv.map((s) => s.name + ' (' + s.kills + ')').join('  ·  '), GM.W / 2, y0 + 28);
+      g.fillText('victory lap' + (surv.length > 1 ? 's' : '') + ' in progress — ' + surv.map((s) => s.name).join('  ·  '), GM.VW / 2, y0 + 28);
     }
-    // kill board
     g.font = '8px monospace';
     let yy = y0 + 56;
     world.teams.forEach((teamShips, ti) => {
       const T = GM.TEAMS[ti];
       g.fillStyle = T.P;
-      g.fillText(T.name, GM.W / 2 - 120, yy);
+      g.fillText(T.name, GM.VW / 2 - 120, yy);
       yy += 11;
       for (const s of teamShips) {
         g.fillStyle = s.dead ? '#4a5468' : '#aebdd6';
-        g.fillText((s.dead ? '  ✝ ' : '  ★ ') + s.name.padEnd(8) + ' — ' + s.spec.name + ' — kills ' + s.kills, GM.W / 2 - 120, yy);
+        g.fillText((s.dead ? '  ✝ ' : '  ★ ') + s.name.padEnd(8) + ' — ' + s.spec.name + ' — kills ' + s.kills, GM.VW / 2 - 120, yy);
         yy += 11;
       }
       yy += 6;
@@ -337,7 +465,7 @@
     if (blink) {
       g.font = 'bold 11px monospace';
       g.fillStyle = '#fff';
-      g.fillText('[R]EMATCH   ·   [ESC] MENU', GM.W / 2, GM.H - 40);
+      g.fillText('[R]EMATCH   ·   [ESC] MENU', GM.VW / 2, GM.VH - 40);
     }
     g.textAlign = 'left';
   };
@@ -347,10 +475,10 @@
     g.textAlign = 'center';
     g.font = 'bold 22px monospace';
     g.fillStyle = '#fff';
-    g.fillText('PAUSED', GM.W / 2, GM.H / 2);
+    g.fillText('PAUSED', GM.VW / 2, GM.VH / 2);
     g.font = '8px monospace';
     g.fillStyle = '#8fa2c0';
-    g.fillText('P to resume', GM.W / 2, GM.H / 2 + 16);
+    g.fillText('P to resume', GM.VW / 2, GM.VH / 2 + 16);
     g.textAlign = 'left';
   };
 

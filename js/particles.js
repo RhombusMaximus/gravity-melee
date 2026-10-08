@@ -1,4 +1,6 @@
-// gravity-melee :: particles, stars, floaters, and screenshake
+// gravity-melee :: particles, stars, floaters, screenshake
+// Stars/particles live in world space; they are drawn at their nearest
+// wrapped copy relative to the camera (U.eff) and culled to the viewport.
 (function (GM) {
   const { U } = GM;
   const FX = { parts: [], stars: [], floats: [], shake: 0, flash: 0 };
@@ -6,7 +8,9 @@
   FX.init = () => {
     FX.parts = []; FX.floats = []; FX.shake = 0; FX.flash = 0;
     FX.stars = [];
-    for (let i = 0; i < 130; i++) {
+    // keep roughly the same on-screen density as the old 640x360 arena
+    const n = Math.round((GM.W * GM.H) / 2560);
+    for (let i = 0; i < n; i++) {
       FX.stars.push({
         x: U.rand(GM.W), y: U.rand(GM.H),
         s: U.chance(0.75) ? 1 : 2,
@@ -65,30 +69,35 @@
 
   FX.drawStars = (g, t) => {
     for (const s of FX.stars) {
+      const e = U.eff(s.x, s.y);
+      if (e.x < -2 || e.x > GM.VW + 2 || e.y < -2 || e.y > GM.VH + 2) continue;
       const tw = 0.7 + 0.3 * Math.sin(t * s.tws + s.tw);
       const b = s.b * tw;
       g.globalAlpha = b;
       g.fillStyle = b > 0.65 ? '#eef4ff' : '#8ea4c8';
-      g.fillRect(s.x | 0, s.y | 0, s.s, s.s);
+      g.fillRect(e.x | 0, e.y | 0, s.s, s.s);
     }
     g.globalAlpha = 1;
   };
 
   FX.draw = (g) => {
     for (const p of FX.parts) {
+      const e = U.eff(p.x, p.y);
+      if (e.x < -8 || e.x > GM.VW + 8 || e.y < -8 || e.y > GM.VH + 8) continue;
       const k = 1 - p.t / p.life;
       g.globalAlpha = Math.min(1, k * 1.6);
       g.fillStyle = p.col;
-      g.fillRect((p.x - p.size / 2) | 0, (p.y - p.size / 2) | 0, p.size, p.size);
+      g.fillRect((e.x - p.size / 2) | 0, (e.y - p.size / 2) | 0, p.size, p.size);
     }
     g.globalAlpha = 1;
+    g.font = 'bold 10px monospace';
+    g.textAlign = 'center';
     for (const f of FX.floats) {
+      const e = U.eff(f.x, f.y);
       const k = 1 - f.t / f.life;
       g.globalAlpha = Math.min(1, k * 2);
       g.fillStyle = f.col;
-      g.font = 'bold 10px monospace';
-      g.textAlign = 'center';
-      g.fillText(f.text, f.x, f.y - f.t * 14);
+      g.fillText(f.text, e.x, e.y - f.t * 14);
     }
     g.globalAlpha = 1;
   };

@@ -1,4 +1,4 @@
-// gravity-melee :: main loop, input, game states
+// gravity-melee :: main loop, input, game states, camera
 (function (GM) {
   const { U } = GM;
 
@@ -10,6 +10,7 @@
   GM.speed = 1;
   GM.debugAI = false;
   GM.humanShip = null;
+  GM.humanTarget = null;     // tab-target lock
   GM.state = 'title';        // 'title' | 'play' | 'victory'
   GM.world = null;
 
@@ -51,8 +52,9 @@
     // play state
     if (GM.state === 'play') {
       if (c === 'KeyQ') possessNext();
-      else if (c === 'Tab') releaseShip();
-      else if (c === 'Escape') { GM.state = 'title'; GM.world = null; GM.humanShip = null; }
+      else if (c === 'KeyE') releaseShip();
+      else if (c === 'Tab') cycleTarget();
+      else if (c === 'Escape') { GM.state = 'title'; GM.world = null; GM.humanShip = null; GM.humanTarget = null; }
     }
   });
 
@@ -77,6 +79,7 @@
     target.aiBrain = target.aiBrain || GM.AI.mkBrain();
     GM.A.SND.possess();
     GM.FX.float(target.x, target.y - 18, 'HELM: ' + target.name, '#fff');
+    autoAcquireTarget();
   }
 
   function releaseShip(playSound = true) {
@@ -86,7 +89,40 @@
     s.humanInput = null;
     s.ctrl = { thrust: 0, turn: 0, fire: false, special: false, brake: false };
     GM.humanShip = null;
+    GM.humanTarget = null;
     if (playSound) GM.A.SND.ui();
+  }
+
+  // ---------- tab targeting ----------
+  function hostiles() {
+    const me = GM.humanShip;
+    if (!me) return [];
+    return GM.world.ships.filter((s) => !s.dead && s.team !== me.team);
+  }
+
+  function autoAcquireTarget() {
+    const foes = hostiles();
+    if (!foes.length) { GM.humanTarget = null; return; }
+    // nearest hostile, or keep current lock if still alive
+    if (GM.humanTarget && !GM.humanTarget.dead && foes.includes(GM.humanTarget)) return;
+    let best = foes[0], bd = Infinity;
+    for (const f of foes) {
+      const w = U.wrapDelta(GM.humanShip.x, GM.humanShip.y, f.x, f.y);
+      const d = U.len(w.x, w.y);
+      if (d < bd) { bd = d; best = f; }
+    }
+    GM.humanTarget = best;
+    GM.A.SND.ui();
+  }
+
+  function cycleTarget() {
+    const foes = hostiles();
+    if (!foes.length) { GM.humanTarget = null; return; }
+    let idx = foes.indexOf(GM.humanTarget);
+    idx = (idx + 1) % foes.length;
+    GM.humanTarget = foes[idx];
+    GM.A.SND.ui();
+    GM.FX.float(GM.humanTarget.x, GM.humanTarget.y - 18, 'TGT: ' + GM.humanTarget.name, GM.TEAMS[GM.humanTarget.team].P);
   }
 
   // ---------- game flow ----------
@@ -95,6 +131,7 @@
     GM.state = 'play';
     GM.paused = false;
     GM.humanShip = null;
+    GM.humanTarget = null;
     GM.FX.init();
     GM.R.init();
     GM.A.SND.ui();
@@ -112,6 +149,45 @@
     };
   }
 
+  // ---------- camera ----------
+  function updateCamera(dt) {
+    const me = GM.humanShip && !GM.humanShip.dead ? GM.humanShip : null;
+    let fx, fy;
+    if (me) {
+      fx = me.x + me.vx * 0.35;      // lead the ship slightly with its velocity
+      fy = me.y + me.vy * 0.35;
+    } else if (GM.world) {
+      // auto-director: follow the geometric center of living ships
+      let sx = 0, sy = 0, n = 0;
+      for (const s of GM.world.ships) {
+        if (s.dead) continue;
+        sx += s.x; sy += s.y; n++;
+      }
+      if (n) {
+        // wrap-aware mean
+        let cx = 0, cy = 0;
+        const ref = GM.world.ships.find((s) => !s.dead);
+        for (const s of GM.world.ships) {
+          if (s.dead) continue;
+          const w = U.wrapDelta(ref.x, ref.y, s.x, s.y);
+          cx += w.x; cy += w.y;
+        }
+        fx = U.wrapX(ref.x + cx / n);
+        fy = U.wrapY(ref.y + cy / n);
+      } else {
+        fx = GM.CAM.x; fy = GM.CAM.y;
+      }
+    } else {
+      fx = GM.CAM.x; fy = GM.CAM.y;
+    }
+    GM.CAM.focus = { x: fx, y: fy };
+    // smooth chase
+    const w = U.wrapDelta(GM.CAM.x, GM.CAM.y, fx, fy);
+    const k = 1 - Math.pow(0.001, dt);        // ~fast catch-up
+    GM.CAM.x = U.wrapX(GM.CAM.x + w.x * k);
+    GM.CAM.y = U.wrapY(GM.CAM.y + w.y * k);
+  }
+
   // ---------- loop ----------
   let last = performance.now();
   let acc = 0;
@@ -122,19 +198,27 @@
     let real = Math.min(0.1, (now - last) / 1000);
     last = now;
 
-    if (GM.state === 'play' && !GM.paused) {
+    const simming = (GM.state === 'play' && !GM.paused) || GM.state === 'victory';
+    if (simming) {
       GM.humanShip && (GM.humanShip.humanInput = humanInput());
       acc += real * GM.speed;
       let steps = 0;
+      let winnerJustSet = false;
       while (acc >= STEP && steps < 8) {
         GM.world.step(STEP);
-        // death mid-step: release helm
-        if (GM.humanShip && GM.humanShip.dead) GM.humanShip = null;
-        if (GM.world.winner !== null) { GM.state = 'victory'; GM.A.SND.victory(); break; }
+        // death mid-step: release helm (world keeps its target refs)
+        if (GM.humanShip && GM.humanShip.dead) { releaseShip(false); }
+        if (GM.world.winner !== null && GM.state === 'play') {
+          GM.state = 'victory';
+          GM.A.SND.victory();
+          winnerJustSet = true;
+          break;
+        }
         acc -= STEP;
         steps++;
       }
-      if (steps >= 8) acc = 0;       // dropped frames; don't accumulate debt
+      if (steps >= 8) acc = 0;
+      updateCamera(real * GM.speed);
     }
 
     draw(now / 1000);
@@ -142,21 +226,20 @@
 
   function draw(t) {
     GM.clockT = t;
-    // screenshake
-    const sh = GM.FX.shake;
+    // screenshake (never in victory)
+    const sh = GM.state === 'victory' ? 0 : GM.FX.shake;
     g.save();
     if (sh > 0.1) g.translate(U.rand(-sh, sh) | 0, U.rand(-sh, sh) | 0);
 
     g.fillStyle = '#04060c';
-    g.fillRect(-20, -20, GM.W + 40, GM.H + 40);
+    g.fillRect(-20, -20, GM.VW + 40, GM.VH + 40);
 
-    if (GM.world) {
+    if (GM.world && (GM.state === 'play' || GM.state === 'victory')) {
       GM.R.drawWorld(g, GM.world, t);
+      GM.R.drawHUD(g, GM.world);
       if (GM.state === 'play') {
-        GM.R.drawHUD(g, GM.world);
         if (GM.paused) GM.R.pausedOverlay(g);
-      } else if (GM.state === 'victory') {
-        GM.R.drawHUD(g, GM.world);
+      } else {
         GM.R.victory(g, GM.world);
       }
     } else {
@@ -169,6 +252,11 @@
       GM.SILENT = true;
       GM.demoWorld.step(1 / 60);
       GM.SILENT = false;
+      // auto-director camera follows the demo action
+      const savedHuman = GM.humanShip;
+      GM.humanShip = null;
+      updateCamera(1 / 60);
+      GM.humanShip = savedHuman;
       GM.R.drawWorld(g, GM.demoWorld, t);
       GM.R.title(g, t);
     }

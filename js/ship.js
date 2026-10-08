@@ -208,12 +208,17 @@
       if (this.dead) return;
       this.dead = true;
       if (by && by !== this && by.team !== this.team) by.kills++;
-      GM.FX.addShake(9);
-      GM.FX.addFlash(0.28);
+      const S = GM.SCALE;
+      // shake the screen on death — UNLESS the match just ended: victory laps
+      // are a celebration, not a disaster
+      if (world.winner === null) {
+        GM.FX.addShake(9);
+        GM.FX.addFlash(0.28);
+      }
       GM.A.SND.boom();
-      GM.FX.emit(this.x, this.y, 34, { spd: 120, life: 1.0, col: '#ffd28a', size: 2.5 });
-      GM.FX.emit(this.x, this.y, 18, { spd: 60, life: 0.8, col: '#ff7a4a', size: 2 });
-      GM.FX.emit(this.x, this.y, 12, { spd: 200, life: 0.5, col: '#fff', size: 1.5 });
+      GM.FX.emit(this.x, this.y, 34, { spd: 120 * S, life: 1.0, col: '#ffd28a', size: 2.5 });
+      GM.FX.emit(this.x, this.y, 18, { spd: 60 * S, life: 0.8, col: '#ff7a4a', size: 2 });
+      GM.FX.emit(this.x, this.y, 12, { spd: 200 * S, life: 0.5, col: '#fff', size: 1.5 });
       GM.FX.float(this.x, this.y - 14, this.name + ' down', '#ffd0a0');
     }
 
@@ -255,20 +260,23 @@
       const T = GM.TEAMS[this.team];
       const art = this.spec.art;
       const w = art[0].length, h = art.length;
+      const e = U.eff(this.x, this.y);        // camera-space position
+      const PS = 2;                            // pixel scale for the 13x12 art
+      if (e.x < -20 || e.x > GM.VW + 20 || e.y < -20 || e.y > GM.VH + 20) return;   // culled
 
       if (this.shield > 0) {
         g.strokeStyle = '#8ef2ff';
         g.globalAlpha = 0.35 + 0.25 * Math.sin(t * 20);
         g.beginPath();
-        g.arc(this.x, this.y, this.r + 4, 0, U.TAU);
+        g.arc(e.x, e.y, this.r + 4, 0, U.TAU);
         g.stroke();
         g.globalAlpha = 1;
       }
 
       g.save();
-      g.translate(this.x, this.y);
+      g.translate(e.x, e.y);
       g.rotate(this.ang + Math.PI / 2);
-      const ox = -Math.floor(w / 2), oy = -Math.floor(h / 2);
+      const ox = -Math.floor(w / 2) * PS, oy = -Math.floor(h / 2) * PS;
       for (let r = 0; r < h; r++) {
         const row = art[r];
         for (let c = 0; c < w; c++) {
@@ -280,7 +288,7 @@
           if (!col) continue;
           if (this.hitT > 0) col = '#fff';
           g.fillStyle = col;
-          g.fillRect(ox + c, oy + r, 1, 1);
+          g.fillRect(ox + c * PS, oy + r * PS, PS, PS);
         }
       }
       g.restore();
@@ -288,7 +296,7 @@
       if (this.spawnProt > 0) {
         g.globalAlpha = 0.3 + 0.2 * Math.sin(t * 12);
         g.strokeStyle = '#fff';
-        g.strokeRect(this.x - 8, this.y - 8, 16, 16);
+        g.strokeRect(e.x - 12, e.y - 12, 24, 24);
         g.globalAlpha = 1;
       }
     }

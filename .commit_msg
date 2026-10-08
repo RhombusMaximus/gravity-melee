@@ -1,0 +1,14 @@
+v0.2.0: camera-following UI, tab-target system, AI locks, victory laps
+
+- Arena 2796x1290 (torus), 640x360 camera follows the player ship with
+  velocity lead; auto-director when spectating
+- All combat geometry rescaled x2.4 (planet, speeds, ranges); 2x sprites
+- Tab-target system: TAB cycles hostiles, auto-acquire on possess;
+  target panel upper right (hull/batt/range/closing); lock brackets +
+  off-screen edge arrows
+- Player panel upper left with subtle amber LOCKED warning when AI
+  targeting computers hold a lock on the player
+- AI targeting now sticky (hysteresis) so duels persist
+- E releases the helm (Tab repurposed for targeting)
+- Victory: no screenshake/flash, ordnance defused, winners fly AI
+  victory laps around the planet under the scoreboard

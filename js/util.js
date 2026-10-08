@@ -41,6 +41,18 @@ window.GM = window.GM || {};
     y: U.wrapY(by - ay + GM.H / 2) - GM.H / 2,
   });
 
+  // effective on-screen position of a world point: nearest wrapped copy to the camera
+  U.eff = (wx, wy) => ({
+    x: U.wrapX(wx - GM.CAM.x + GM.W / 2) - GM.W / 2 + GM.VW / 2,
+    y: U.wrapY(wy - GM.CAM.y + GM.H / 2) - GM.H / 2 + GM.VH / 2,
+  });
+
+  // world position of a viewport (screen) point
+  U.unscreen = (vx, vy) => ({
+    x: U.wrapX(GM.CAM.x + vx - GM.VW / 2),
+    y: U.wrapY(GM.CAM.y + vy - GM.VH / 2),
+  });
+
   // distance from point (cx,cy) to segment (ax,ay)-(bx,by) <= r ?
   U.segCircle = (ax, ay, bx, by, cx, cy, r) => {
     const dx = bx - ax, dy = by - ay;

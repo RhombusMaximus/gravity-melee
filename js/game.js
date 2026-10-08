@@ -7,6 +7,7 @@
     shot: '#ff9ad0', lob: '#b6ff9e', pellet: '#e8e0ff',
   };
   const SHOT_GRAV = { dart: 0.25, bolt: 0.3, plasma: 0.8, shot: 0.25, lob: 1.0, pellet: 0.25 };
+  const S2 = GM.SCALE;
 
   class World {
     constructor(mode, opts) {
@@ -125,11 +126,22 @@
         if (d < sp.rad) {
           const k = 1 - d / sp.rad;
           const n = U.norm(w.x, w.y);
-          s.vx += n.x * 230 * k;
-          s.vy += n.y * 230 * k;
+          s.vx += n.x * 230 * S2 * k;
+          s.vy += n.y * 230 * S2 * k;
           s.damage(2 * k, ship, this, 'gravpulse');
         }
       }
+    }
+
+    // who has a lock on the given ship (for the HUD warning)
+    lockedOnMe(me) {
+      if (!me || me.dead) return [];
+      const out = [];
+      for (const s of this.ships) {
+        if (s.dead || s.team === me.team) continue;
+        if (s.aiBrain && s.aiBrain.tgt === me) out.push(s);
+      }
+      return out;
     }
 
     explode(x, y, dmg, rad, by, kind) {
@@ -306,12 +318,21 @@
       GM.FX.update(dt);
 
       // victory check
+      let justWon = false;
       if (this.winner === null) {
         const aliveTeams = new Set();
         let anyAlive = false;
         for (const s of this.ships) if (!s.dead) { aliveTeams.add(s.team); anyAlive = true; }
-        if (!anyAlive) this.winner = -1;
-        else if (aliveTeams.size === 1) this.winner = [...aliveTeams][0];
+        if (!anyAlive) { this.winner = -1; justWon = true; }
+        else if (aliveTeams.size === 1) { this.winner = [...aliveTeams][0]; justWon = true; }
+      }
+      // moment of victory: defuse lingering ordnance, zero screenshake/flash
+      if (justWon) {
+        this.shots.length = 0;
+        this.missiles.length = 0;
+        for (const s of this.ships) s.mines.length = 0;
+        GM.FX.shake = 0;
+        GM.FX.flash = 0;
       }
     }
   }

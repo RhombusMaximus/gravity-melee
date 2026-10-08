@@ -13,6 +13,9 @@ Open `index.html` in any browser — no build, no dependencies, no server.
 
 Or play the hosted copy: **https://rhombusmaximus.github.io/gravity-melee/**
 
+The camera follows your ship across a 2796×1290 torus arena; the view is
+640×360 pixel-art, always centered on the action.
+
 ## Modes
 
 | Key | Mode |
@@ -30,11 +33,32 @@ Or play the hosted copy: **https://rhombusmaximus.github.io/gravity-melee/**
 | S | brake |
 | SPACE | fire |
 | SHIFT | special ability |
-| TAB | hand the ship back to the AI |
+| TAB | cycle target lock among hostiles |
+| E | release the helm back to the AI |
 | G | show AI minds (targets, modes, line-of-sight) |
 | P | pause |
 | M | mute |
 | - / = | simulation speed ×0.25 … ×4 |
+
+## HUD
+
+- **Upper left** — your ship: pilot, crew, battery, special readiness, and a
+  subtle amber warning when enemy targeting computers have a lock on you.
+- **Upper right** — your current target: pilot, ship class, hull, battery,
+  range and closing speed.
+- **World** — cyan lock brackets frame your target on screen; a colored arrow
+  at the viewport edge points to it when it's off-screen.
+- **Bottom left** — full team roster (dead pilots grayed out).
+- **Bottom right** — minimap of the whole 2796×1290 arena: planet, moon,
+  every ship, your viewport rectangle, and a ring on your locked target.
+
+## AI targeting
+
+Every AI pilot runs a targeting computer with **sticky locks**: they keep
+their victim until someone else is dramatically closer, so duels persist
+instead of everyone re-targeting every second. When an enemy has a lock on
+you, the HUD says so — check the minimap and either break the lock behind
+the planet or take the fight to them.
 
 ## The gravity well
 
@@ -48,6 +72,9 @@ Or play the hosted copy: **https://rhombusmaximus.github.io/gravity-melee/**
   fight gets desperate. Finish it before the planet eats everyone.
 - Each pilot has a personality archetype (Reckless, Cautious, Duelist, Sniper,
   Brawler, Trickster) that shapes aggression, evasion, and special usage.
+- When the match is decided, remaining ordnance is defused, the screen does
+  **not** shake, and the winners fly AI-piloted **victory laps** around the
+  planet while the scoreboard fades in.
 
 ## Ships
 
@@ -62,9 +89,10 @@ Or play the hosted copy: **https://rhombusmaximus.github.io/gravity-melee/**
 
 ## Tech
 
-Vanilla JS + HTML5 canvas at 640×360, upscaled with `image-rendering: pixelated`.
-Ships are 13×12 pixel-art string maps; the planet/moon are baked per-pixel once
-at boot. Audio is synthesized WebAudio — zero assets anywhere.
+Vanilla JS + HTML5 canvas at 640×360 (camera follows the player across a
+2796×1290 world), upscaled with `image-rendering: pixelated`. Ships are
+13×12 pixel-art string maps rendered at 2×; the planet/moon are baked
+per-pixel once at boot. Audio is synthesized WebAudio — zero assets anywhere.
 
 ## License
 

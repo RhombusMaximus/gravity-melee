@@ -1,16 +1,25 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.1.0';
+  GM.VERSION = '0.2.0';
 
-  GM.W = 640;
-  GM.H = 360;
+  // The arena is far larger than the 640x360 viewport; the camera follows the
+  // player's ship. SCALE multiplies all combat geometry (planet size, ship
+  // speeds, weapon ranges) so duels fill the bigger world at the same pacing.
+  GM.SCALE = 2.4;
+
+  GM.W = 2796;
+  GM.H = 1290;
+  GM.VW = 640;
+  GM.VH = 360;
+
+  GM.CAM = { x: GM.W / 2, y: GM.H / 2, focus: null };
 
   GM.PHYS = {
     dt: 1 / 60,
-    planet: { x: 320, y: 180, r: 26, GM: 390000, rInf: 170, knee: 138, aCap: 520 },
-    moon:   { r: 8, GM: 22000, rInf: 70, knee: 52, aCap: 300, orbitR: 132, omega: 0.34 },
-    spawnR: 92,
-    surgeAt: 170,   // seconds until gravity surge begins ramping
+    planet: { x: 1398, y: 645, r: 62, GM: 2246400, rInf: 408, knee: 331, aCap: 1248 },
+    moon:   { r: 19, GM: 126720, rInf: 168, knee: 125, aCap: 720, orbitR: 317, omega: 0.34 },
+    spawnR: 221,
+    surgeAt: 170,
     surgeRate: 0.02,
     surgeMax: 3.0,
   };
@@ -21,7 +30,6 @@
     { name: 'VERDANT', P: '#6fff4e', S: '#1f7a35', glow: '#d2ffbe' },
   ];
 
-  // sprite palette: P/S are substituted per team
   GM.CHARS = {
     W: '#f4f8ff', H: '#a9b3c6', h: '#5f6b83', G: '#8ef2ff',
     E: '#ffab3d', e: '#d0641e',
@@ -56,7 +64,7 @@
     '.HPWPPWPPWPH.',
     '.HPPPPWPPPPH.',
     '...HPPWPPH...',
-    '....hPPPPh....',
+    '....hPPPPh...',
     '....e.E.e....',
     '......E......',
   ];
@@ -70,10 +78,10 @@
     'HPPSSPPPSSPPH',
     'HPPPPGPGPPPPH',
     '.HPPPPPPPPPH.',
-    '..HPPPPPPPPH..'.slice(0, 13),
+    '.HPPPPPPPPPH.',
     '...HPPePPH...',
     '...eEEeEEe...',
-    '....E..E..E..'.slice(0, 13),
+    '....E..E..E..',
   ];
 
   ART.mantis = [
@@ -83,7 +91,7 @@
     '...WH.H.HW...',
     '....WHWHW....',
     '.....HPH.....',
-    '...H.HPPH.H..'.slice(0, 13),
+    '..H.HPPH.H...',
     '...W.HSPSH.W.',
     '....HSPSH....',
     '.....hPh.....',
@@ -171,6 +179,22 @@
       special: { label: 'Sting Mine', type: 'mine', cost: 6, cd: 1.1, dmg: 12, rad: 28, maxMines: 4, snd: 'mine' },
     },
   ];
+
+  // Normalize specs to world scale: distances/speeds xS, sprites render 2x.
+  const S = GM.SCALE;
+  for (const sp of GM.SHIPS) {
+    sp.accel *= S;
+    sp.maxSpeed *= S;
+    sp.orbit *= S;
+    sp.r *= 2;
+    sp.weapon.speed *= S;
+    sp.weapon.size *= 2;
+    if (sp.weapon.aoe) sp.weapon.aoe *= S;
+    const k = sp.special;
+    if (k.speed) k.speed *= S;
+    if (k.range) k.range *= S;
+    if (k.rad) k.rad *= S;
+  }
 
   GM.MODES = [
     { key: '1', label: '1 v 1',       teams: [1, 1] },
