@@ -42,22 +42,22 @@ window.GM = window.GM || {};
   });
 
   // effective on-screen position of a world point: nearest wrapped copy to the
-  // camera, in WORLD-CANVAS units (GM.WV x GM.WH canvas)
+  // camera, in WORLD-CANVAS px (canvas 2304x1296; GM.zoomCur px per world unit)
   U.eff = (wx, wy) => ({
-    x: U.wrapX(wx - GM.CAM.x + GM.W / 2) - GM.W / 2 + GM.WV / 2,
-    y: U.wrapY(wy - GM.CAM.y + GM.H / 2) - GM.H / 2 + GM.WH / 2,
+    x: (U.wrapX(wx - GM.CAM.x + GM.W / 2) - GM.W / 2) * GM.zoomCur + GM.WV / 2,
+    y: (U.wrapY(wy - GM.CAM.y + GM.H / 2) - GM.H / 2) * GM.zoomCur + GM.WH / 2,
   });
 
   // same world point in HUD-overlay space (640x360)
   U.effH = (wx, wy) => ({
-    x: (U.wrapX(wx - GM.CAM.x + GM.W / 2) - GM.W / 2 + GM.WV / 2) * GM.VW / GM.WV,
-    y: (U.wrapY(wy - GM.CAM.y + GM.H / 2) - GM.H / 2 + GM.WH / 2) * GM.VH / GM.WH,
+    x: ((U.wrapX(wx - GM.CAM.x + GM.W / 2) - GM.W / 2) * GM.zoomCur + GM.WV / 2) * GM.VW / GM.WV,
+    y: ((U.wrapY(wy - GM.CAM.y + GM.H / 2) - GM.H / 2) * GM.zoomCur + GM.WH / 2) * GM.VH / GM.WH,
   });
 
   // world position of a viewport (screen) point
   U.unscreen = (vx, vy) => ({
-    x: U.wrapX(GM.CAM.x + vx - GM.VW / 2),
-    y: U.wrapY(GM.CAM.y + vy - GM.VH / 2),
+    x: U.wrapX(GM.CAM.x + (vx - GM.VW / 2) / GM.zoomCur),
+    y: U.wrapY(GM.CAM.y + (vy - GM.VH / 2) / GM.zoomCur),
   });
 
   // distance from point (cx,cy) to segment (ax,ay)-(bx,by) <= r ?

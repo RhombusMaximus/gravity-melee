@@ -55,57 +55,62 @@
 
     GM.FX.drawStars(g, t);
 
+    const zs = GM.zoomCur;   // world->canvas zoom factor
+
     // gravity field rings
     g.strokeStyle = '#1c2a44';
     g.globalAlpha = 0.5;
     g.setLineDash([2, 5]);
     for (const rr of [P.knee, P.rInf]) {
-      g.beginPath(); g.arc(e2.x, e2.y, rr, 0, U.TAU); g.stroke();
+      g.beginPath(); g.arc(e2.x, e2.y, rr * zs, 0, U.TAU); g.stroke();
     }
     g.setLineDash([]);
     // danger ring
     g.strokeStyle = world.surgeMult > 1.05 ? '#a03028' : '#4a2430';
-    g.beginPath(); g.arc(e2.x, e2.y, P.r + 40, 0, U.TAU); g.stroke();
+    g.beginPath(); g.arc(e2.x, e2.y, (P.r + 40) * zs, 0, U.TAU); g.stroke();
     g.globalAlpha = 1;
 
     // moon orbit path
     g.strokeStyle = '#1a2233';
     g.globalAlpha = 0.6;
-    g.beginPath(); g.arc(e2.x, e2.y, M.orbitR, 0, U.TAU); g.stroke();
+    g.beginPath(); g.arc(e2.x, e2.y, M.orbitR * zs, 0, U.TAU); g.stroke();
     g.globalAlpha = 1;
 
     // planet glow (stronger with surge)
     const surgeGlow = world.surgeMult > 1.05;
-    const glowR = P.r + 6 + Math.sin(t * 2) * 1.5 + (world.surgeMult - 1) * 4;
-    const grd = g.createRadialGradient(e2.x, e2.y, P.r * 0.6, e2.x, e2.y, glowR + 10);
+    const glowR = (P.r + 6 + Math.sin(t * 2) * 1.5 + (world.surgeMult - 1) * 4) * zs;
+    const grd = g.createRadialGradient(e2.x, e2.y, P.r * 0.6 * zs, e2.x, e2.y, glowR + 10 * zs);
     grd.addColorStop(0, surgeGlow ? 'rgba(255,120,60,0.28)' : 'rgba(255,150,90,0.16)');
     grd.addColorStop(1, 'rgba(255,150,90,0)');
     g.fillStyle = grd;
-    g.beginPath(); g.arc(e2.x, e2.y, glowR + 10, 0, U.TAU); g.fill();
+    g.beginPath(); g.arc(e2.x, e2.y, glowR + 10 * zs, 0, U.TAU); g.fill();
 
-    // planet body
-    g.drawImage(R.planetCv, (e2.x - P.r) | 0, (e2.y - P.r) | 0);
+    // planet body (scaled with zoom; nearest-neighbor keeps the pixel look)
+    const pd = Math.max(2, Math.round(P.r * 2 * zs));
+    g.drawImage(R.planetCv, (e2.x - pd / 2) | 0, (e2.y - pd / 2) | 0, pd, pd);
 
     // surge pulses
     if (surgeGlow) {
       const k = (t * 0.8) % 1;
       g.strokeStyle = '#ff6a3a';
       g.globalAlpha = (1 - k) * 0.5;
-      g.beginPath(); g.arc(e2.x, e2.y, P.r + k * 90, 0, U.TAU); g.stroke();
+      g.beginPath(); g.arc(e2.x, e2.y, (P.r + k * 90) * zs, 0, U.TAU); g.stroke();
       g.globalAlpha = 1;
     }
 
     // moon
     const em = U.eff(mp.x, mp.y);
-    g.drawImage(R.moonCv, (em.x - M.r) | 0, (em.y - M.r) | 0);
+    const md = Math.max(2, Math.round(M.r * 2 * zs));
+    g.drawImage(R.moonCv, (em.x - md / 2) | 0, (em.y - md / 2) | 0, md, md);
 
     // mines
     for (const s of world.ships) {
       for (const m of s.mines) {
         const e = U.eff(m.x, m.y);
         if (e.x < -4 || e.x > GM.WV + 4 || e.y < -4 || e.y > GM.WH + 4) continue;
+        const ms = Math.max(2, Math.round(3 * zs));
         g.fillStyle = GM.TEAMS[s.team].P;
-        g.fillRect((e.x - 1) | 0, (e.y - 1) | 0, 3, 3);
+        g.fillRect((e.x - ms / 2) | 0, (e.y - ms / 2) | 0, ms, ms);
         if (m.armed && Math.sin(m.t * 8) > 0) {
           g.fillStyle = '#fff';
           g.fillRect(e.x | 0, e.y | 0, 1, 1);
@@ -118,10 +123,11 @@
       const e = U.eff(sh.x, sh.y);
       if (e.x < -8 || e.x > GM.WV + 8 || e.y < -8 || e.y > GM.WH + 8) continue;
       const sp = U.norm(sh.vx, sh.vy);
-      const tl = Math.min(4, sh.size + 2);
+      const sz = sh.size * zs;
+      const tl = Math.min(4, sh.size + 2) * zs;
       g.fillStyle = sh.col;
-      g.fillRect((e.x - sp.x * tl / 2 - sh.size / 2) | 0, (e.y - sp.y * tl / 2 - sh.size / 2) | 0, sh.size, sh.size);
-      g.fillRect((e.x + sp.x * tl / 2 - sh.size / 2) | 0, (e.y + sp.y * tl / 2 - sh.size / 2) | 0, sh.size, sh.size);
+      g.fillRect((e.x - sp.x * tl / 2 - sz / 2) | 0, (e.y - sp.y * tl / 2 - sz / 2) | 0, sz | 0 || 1, sz | 0 || 1);
+      g.fillRect((e.x + sp.x * tl / 2 - sz / 2) | 0, (e.y + sp.y * tl / 2 - sz / 2) | 0, sz | 0 || 1, sz | 0 || 1);
     }
 
     // missiles
@@ -131,13 +137,14 @@
       g.save();
       g.translate(e.x, e.y);
       g.rotate(ms.ang + Math.PI / 2);
+      const mz = Math.max(1, zs);
       g.fillStyle = '#e8e8f4';
-      g.fillRect(-1, -3, 2, 5);
+      g.fillRect(-1 * mz, -3 * mz, 2 * mz, 5 * mz);
       g.fillStyle = GM.TEAMS[ms.team].P;
-      g.fillRect(-1, -3, 2, 1);
+      g.fillRect(-1 * mz, -3 * mz, 2 * mz, 1 * mz);
       if (U.chance(0.6)) {
         g.fillStyle = '#ffb04a';
-        g.fillRect(-1, 2, 2, 1 + (Math.random() * 2 | 0));
+        g.fillRect(-1 * mz, 2 * mz, 2 * mz, (1 + (Math.random() * 2 | 0)) * mz);
       }
       g.restore();
       GM.FX.emit(ms.x, ms.y, 1, { spd: 6, life: 0.4, col: '#6a7080', size: 1 });
@@ -162,7 +169,7 @@
     const tgt = GM.humanTarget;
     if (!tgt || tgt.dead) return;
     const e = U.effH(tgt.x, tgt.y);
-    const r = (tgt.r + 6) * GM.VW / GM.WV;      // world radius scaled to HUD space
+    const r = (tgt.r + 6) * GM.zoomCur * GM.VW / GM.WV;      // world radius scaled to HUD space
     const col = GM.TEAMS[tgt.team].P;
     const onscreen = e.x > 4 && e.x < GM.VW - 4 && e.y > 4 && e.y < GM.VH - 4;
     if (onscreen) {
@@ -388,7 +395,8 @@
     if (me && !me.dead) {
       g.strokeStyle = '#3fc8ff';
       g.globalAlpha = 0.4;
-      g.strokeRect(mx + (me.x - GM.WV / 2) * sx, my + (me.y - GM.WH / 2) * sy, GM.WV * sx, GM.WH * sy);
+      const zs = GM.zoomCur;
+      g.strokeRect(mx + (me.x - GM.WV / 2 / zs) * sx, my + (me.y - GM.WH / 2 / zs) * sy, GM.WV / zs * sx, GM.WH / zs * sy);
       g.globalAlpha = 1;
     }
   };

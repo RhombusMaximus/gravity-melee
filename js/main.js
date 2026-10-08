@@ -230,8 +230,28 @@
     } else {
       fx = GM.CAM.x; fy = GM.CAM.y;
     }
+
+    // ----- dynamic zoom: close to target = zoomed in -----
+    const tgt = GM.humanTarget;
+    let zoomWant = GM.ZOOM.min;
+    if (me && tgt && !tgt.dead && GM.humanShip) {
+      const w = U.wrapDelta(me.x, me.y, tgt.x, tgt.y);
+      const dist = U.len(w.x, w.y);
+      const z = GM.ZOOM;
+      // dist close->far maps to zoom max->min (smoothstep)
+      const t = U.clamp((dist - z.close) / (z.far - z.close), 0, 1);
+      zoomWant = z.max - (z.max - z.min) * t;
+      // frame the duel: bias the camera midpoint toward the target
+      const bias = 0.22 * (1 - t);   // stronger pull when zoomed in
+      fx = U.wrapX(fx + w.x * bias);
+      fy = U.wrapY(fy + w.y * bias);
+    }
     GM.CAM.focus = { x: fx, y: fy };
-    // smooth chase
+    // smooth zoom chase (slower than the pan so it doesn't feel twitchy)
+    const zk = 1 - Math.pow(0.05, dt);
+    GM.zoomCur += (zoomWant - GM.zoomCur) * zk;
+
+    // smooth pan
     const w = U.wrapDelta(GM.CAM.x, GM.CAM.y, fx, fy);
     const k = 1 - Math.pow(0.001, dt);        // ~fast catch-up
     GM.CAM.x = U.wrapX(GM.CAM.x + w.x * k);

@@ -272,14 +272,14 @@
       const art = this.spec.art;
       const w = art[0].length, h = art.length;
       const e = U.eff(this.x, this.y);        // camera-space position
-      const PS = 3;                            // pixel scale for the 13x12 art
-      if (e.x < -20 || e.x > GM.WV + 20 || e.y < -20 || e.y > GM.WH + 20) return;   // culled
+      const PS = Math.max(2, Math.round(3 * GM.zoomCur));   // pixel scale, zoom-aware
+      if (e.x < -40 || e.x > GM.WV + 40 || e.y < -40 || e.y > GM.WH + 40) return;   // culled
 
       if (this.shield > 0) {
         g.strokeStyle = '#8ef2ff';
         g.globalAlpha = 0.35 + 0.25 * Math.sin(t * 20);
         g.beginPath();
-        g.arc(e.x, e.y, this.r + 4, 0, U.TAU);
+        g.arc(e.x, e.y, (this.r + 4) * GM.zoomCur, 0, U.TAU);
         g.stroke();
         g.globalAlpha = 1;
       }
@@ -307,7 +307,8 @@
       if (this.spawnProt > 0) {
         g.globalAlpha = 0.3 + 0.2 * Math.sin(t * 12);
         g.strokeStyle = '#fff';
-        g.strokeRect(e.x - 12, e.y - 12, 24, 24);
+        const q = 12 * GM.zoomCur;
+        g.strokeRect(e.x - q, e.y - q, q * 2, q * 2);
         g.globalAlpha = 1;
       }
     }

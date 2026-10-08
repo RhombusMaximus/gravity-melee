@@ -81,23 +81,26 @@
   };
 
   FX.draw = (g) => {
+    const zs = GM.zoomCur;
     for (const p of FX.parts) {
       const e = U.eff(p.x, p.y);
       if (e.x < -8 || e.x > GM.WV + 8 || e.y < -8 || e.y > GM.WH + 8) continue;
       const k = 1 - p.t / p.life;
       g.globalAlpha = Math.min(1, k * 1.6);
       g.fillStyle = p.col;
-      g.fillRect((e.x - p.size / 2) | 0, (e.y - p.size / 2) | 0, p.size, p.size);
+      const ps = Math.max(1, p.size * zs);
+      g.fillRect((e.x - ps / 2) | 0, (e.y - ps / 2) | 0, Math.max(1, ps | 0), Math.max(1, ps | 0));
     }
     g.globalAlpha = 1;
-    g.font = 'bold 10px monospace';
+    const fz = Math.max(1, Math.round(10 * zs));
+    g.font = 'bold ' + fz + 'px monospace';
     g.textAlign = 'center';
     for (const f of FX.floats) {
       const e = U.eff(f.x, f.y);
       const k = 1 - f.t / f.life;
       g.globalAlpha = Math.min(1, k * 2);
       g.fillStyle = f.col;
-      g.fillText(f.text, e.x, e.y - f.t * 14);
+      g.fillText(f.text, e.x, e.y - f.t * 14 * zs);
     }
     g.globalAlpha = 1;
   };
