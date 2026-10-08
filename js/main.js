@@ -5,6 +5,10 @@
   const cv = document.getElementById('cv');
   const g = cv.getContext('2d');
   g.imageSmoothingEnabled = false;
+  const hud = document.getElementById('hud');
+  const hg = hud.getContext('2d');
+  hud.imageSmoothingEnabled = false;   // wait: text/HUD want crispness but the
+  // 640x360 canvas is CSS-stretched; keep smoothing off for the pixel look
 
   GM.paused = false;
   GM.speed = 1;
@@ -51,8 +55,8 @@
 
     // play state
     if (GM.state === 'play') {
-      if (c === 'KeyQ') possessNext();
-      else if (c === 'KeyE') releaseShip();
+      if (c === 'KeyF') possessNext();
+      else if (c === 'KeyX') releaseShip();
       else if (c === 'Tab') cycleTarget();
       else if (c === 'Escape') { GM.state = 'title'; GM.world = null; GM.humanShip = null; GM.humanTarget = null; }
     }
@@ -143,6 +147,7 @@
     return {
       thrust: keys['KeyW'] ? 1 : 0,
       turn: (keys['KeyA'] ? -1 : 0) + (keys['KeyD'] ? 1 : 0),
+      strafe: (keys['KeyQ'] ? -1 : 0) + (keys['KeyE'] ? 1 : 0),
       fire: !!keys['Space'],
       special: !!keys['ShiftLeft'] || !!keys['ShiftRight'],
       brake: !!keys['KeyS'],
@@ -226,22 +231,17 @@
 
   function draw(t) {
     GM.clockT = t;
-    // screenshake (never in victory)
+    // screenshake (never in victory) — applied to the world layer only
     const sh = GM.state === 'victory' ? 0 : GM.FX.shake;
     g.save();
     if (sh > 0.1) g.translate(U.rand(-sh, sh) | 0, U.rand(-sh, sh) | 0);
 
+    // ===== WORLD LAYER (#cv, 2304x1296) =====
     g.fillStyle = '#04060c';
-    g.fillRect(-20, -20, GM.VW + 40, GM.VH + 40);
+    g.fillRect(-30, -30, GM.WV + 60, GM.WH + 60);
 
     if (GM.world && (GM.state === 'play' || GM.state === 'victory')) {
       GM.R.drawWorld(g, GM.world, t);
-      GM.R.drawHUD(g, GM.world);
-      if (GM.state === 'play') {
-        if (GM.paused) GM.R.pausedOverlay(g);
-      } else {
-        GM.R.victory(g, GM.world);
-      }
     } else {
       // title background: idle demo world (silent, recreated when it ends)
       if (!GM.demoWorld || GM.demoWorld.winner !== null) {
@@ -258,9 +258,23 @@
       updateCamera(1 / 60);
       GM.humanShip = savedHuman;
       GM.R.drawWorld(g, GM.demoWorld, t);
-      GM.R.title(g, t);
     }
     g.restore();
+
+    // ===== HUD LAYER (#hud, 640x360) =====
+    hg.clearRect(0, 0, GM.VW, GM.VH);
+    if (GM.world && (GM.state === 'play' || GM.state === 'victory')) {
+      GM.R.drawTargeting(hg, GM.world, t);
+      GM.R.drawHUD(hg, GM.world);
+      if (GM.debugAI) GM.R.drawDebug(hg, GM.world);
+      if (GM.state === 'play') {
+        if (GM.paused) GM.R.pausedOverlay(hg);
+      } else {
+        GM.R.victory(hg, GM.world);
+      }
+    } else {
+      GM.R.title(hg, t);
+    }
   }
 
   // boot

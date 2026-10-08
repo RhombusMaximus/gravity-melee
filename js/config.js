@@ -1,6 +1,6 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.2.0';
+  GM.VERSION = '0.3.0';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
@@ -9,7 +9,9 @@
 
   GM.W = 2796;
   GM.H = 1290;
-  GM.VW = 640;
+  GM.WV = 2304;   // world-view canvas: zoomed out, most of the arena visible
+  GM.WH = 1296;
+  GM.VW = 640;    // HUD overlay canvas (all HUD code draws in this space)
   GM.VH = 360;
 
   GM.CAM = { x: GM.W / 2, y: GM.H / 2, focus: null };
@@ -186,9 +188,9 @@
     sp.accel *= S;
     sp.maxSpeed *= S;
     sp.orbit *= S;
-    sp.r *= 2;
+    sp.r *= 3;
     sp.weapon.speed *= S;
-    sp.weapon.size *= 2;
+    sp.weapon.size *= 3;
     if (sp.weapon.aoe) sp.weapon.aoe *= S;
     const k = sp.special;
     if (k.speed) k.speed *= S;

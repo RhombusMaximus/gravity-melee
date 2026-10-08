@@ -103,7 +103,7 @@
     for (const s of world.ships) {
       for (const m of s.mines) {
         const e = U.eff(m.x, m.y);
-        if (e.x < -4 || e.x > GM.VW + 4 || e.y < -4 || e.y > GM.VH + 4) continue;
+        if (e.x < -4 || e.x > GM.WV + 4 || e.y < -4 || e.y > GM.WH + 4) continue;
         g.fillStyle = GM.TEAMS[s.team].P;
         g.fillRect((e.x - 1) | 0, (e.y - 1) | 0, 3, 3);
         if (m.armed && Math.sin(m.t * 8) > 0) {
@@ -116,7 +116,7 @@
     // shots
     for (const sh of world.shots) {
       const e = U.eff(sh.x, sh.y);
-      if (e.x < -8 || e.x > GM.VW + 8 || e.y < -8 || e.y > GM.VH + 8) continue;
+      if (e.x < -8 || e.x > GM.WV + 8 || e.y < -8 || e.y > GM.WH + 8) continue;
       const sp = U.norm(sh.vx, sh.vy);
       const tl = Math.min(4, sh.size + 2);
       g.fillStyle = sh.col;
@@ -127,7 +127,7 @@
     // missiles
     for (const ms of world.missiles) {
       const e = U.eff(ms.x, ms.y);
-      if (e.x < -8 || e.x > GM.VW + 8 || e.y < -8 || e.y > GM.VH + 8) continue;
+      if (e.x < -8 || e.x > GM.WV + 8 || e.y < -8 || e.y > GM.WH + 8) continue;
       g.save();
       g.translate(e.x, e.y);
       g.rotate(ms.ang + Math.PI / 2);
@@ -146,29 +146,23 @@
     // ships
     for (const s of world.ships) s.draw(g, t);
 
-    // AI debug
-    if (GM.debugAI) R.drawDebug(g, world);
-
     GM.FX.draw(g);
-
-    // lock brackets + offscreen arrows for the player's target
-    R.drawTargeting(g, world, t);
 
     // screen flash (never during victory)
     if (GM.FX.flash > 0.01 && GM.state !== 'victory') {
       g.globalAlpha = GM.FX.flash;
       g.fillStyle = '#fff';
-      g.fillRect(0, 0, GM.VW, GM.VH);
+      g.fillRect(0, 0, GM.WV, GM.WH);
       g.globalAlpha = 1;
     }
   };
 
-  // ---------- targeting visuals ----------
+  // ---------- targeting visuals (HUD overlay, 640x360 space) ----------
   R.drawTargeting = (g, world, t) => {
     const tgt = GM.humanTarget;
     if (!tgt || tgt.dead) return;
-    const e = U.eff(tgt.x, tgt.y);
-    const r = tgt.r + 6;
+    const e = U.effH(tgt.x, tgt.y);
+    const r = (tgt.r + 6) * GM.VW / GM.WV;      // world radius scaled to HUD space
     const col = GM.TEAMS[tgt.team].P;
     const onscreen = e.x > 4 && e.x < GM.VW - 4 && e.y > 4 && e.y < GM.VH - 4;
     if (onscreen) {
@@ -209,16 +203,16 @@
     }
   };
 
-  // ---------- AI debug ----------
+  // ---------- AI debug (HUD overlay space) ----------
   R.drawDebug = (g, world) => {
     g.font = '7px monospace';
     for (const s of world.ships) {
       if (s.dead || !s.aiBrain) continue;
       const b = s.aiBrain;
-      const e = U.eff(s.x, s.y);
+      const e = U.effH(s.x, s.y);
       if (e.x < -20 || e.x > GM.VW + 20 || e.y < -20 || e.y > GM.VH + 20) continue;
       if (b.tgt && !b.tgt.dead) {
-        const te = U.eff(b.tgt.x, b.tgt.y);
+        const te = U.effH(b.tgt.x, b.tgt.y);
         g.strokeStyle = GM.TEAMS[s.team].P;
         g.globalAlpha = 0.35;
         g.beginPath();
@@ -349,7 +343,7 @@
     if (me && !me.dead) {
       g.textAlign = 'left';
       g.fillStyle = '#7488a8';
-      g.fillText('[E] release helm  ·  [TAB] cycle target', 8, GM.VH - 6);
+      g.fillText('[X] release helm  ·  [TAB] cycle target', 8, GM.VH - 6);
     }
     g.textAlign = 'left';
   };
@@ -388,8 +382,8 @@
     if (me && !me.dead) {
       g.strokeStyle = '#3fc8ff';
       g.globalAlpha = 0.4;
-      g.strokeRect(mx + (me.x - GM.VW / 2) * sx, my + (me.y - GM.VH / 2) * sy, GM.VW * sx, GM.VH * sy);
-      g.globalAlpha =  me.globalAlpha = 1;
+      g.strokeRect(mx + (me.x - GM.WV / 2) * sx, my + (me.y - GM.WH / 2) * sy, GM.WV * sx, GM.WH * sy);
+      g.globalAlpha = 1;
     }
   };
 
@@ -419,8 +413,8 @@
     g.font = '8px monospace';
     g.fillStyle = '#55688a';
     g.fillText('[1] 1v1    [2] 2v2    [3] 3v3v3', GM.VW / 2, 168);
-    g.fillText('Q take helm · WASD fly · TAB cycle targets · SPACE fire · SHIFT special', GM.VW / 2, 196);
-    g.fillText('E release helm · G AI minds · P pause · M mute · -/= sim speed', GM.VW / 2, 210);
+    g.fillText('F take helm · WASD fly · Q/E strafe · SPACE fire · SHIFT special', GM.VW / 2, 196);
+    g.fillText('TAB cycle targets · X release helm · G AI minds · P pause · M mute · -/= sim speed', GM.VW / 2, 210);
     g.fillStyle = '#3c4a66';
     g.fillText('v' + GM.VERSION + ' — a love letter to Star Control II melee', GM.VW / 2, GM.VH - 14);
     g.textAlign = 'left';

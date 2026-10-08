@@ -70,7 +70,7 @@
   FX.drawStars = (g, t) => {
     for (const s of FX.stars) {
       const e = U.eff(s.x, s.y);
-      if (e.x < -2 || e.x > GM.VW + 2 || e.y < -2 || e.y > GM.VH + 2) continue;
+      if (e.x < -2 || e.x > GM.WV + 2 || e.y < -2 || e.y > GM.WH + 2) continue;
       const tw = 0.7 + 0.3 * Math.sin(t * s.tws + s.tw);
       const b = s.b * tw;
       g.globalAlpha = b;
@@ -83,7 +83,7 @@
   FX.draw = (g) => {
     for (const p of FX.parts) {
       const e = U.eff(p.x, p.y);
-      if (e.x < -8 || e.x > GM.VW + 8 || e.y < -8 || e.y > GM.VH + 8) continue;
+      if (e.x < -8 || e.x > GM.WV + 8 || e.y < -8 || e.y > GM.WH + 8) continue;
       const k = 1 - p.t / p.life;
       g.globalAlpha = Math.min(1, k * 1.6);
       g.fillStyle = p.col;

@@ -13,8 +13,10 @@ Open `index.html` in any browser — no build, no dependencies, no server.
 
 Or play the hosted copy: **https://rhombusmaximus.github.io/gravity-melee/**
 
-The camera follows your ship across a 2796×1290 torus arena; the view is
-640×360 pixel-art, always centered on the action.
+The camera follows your ship across a 2796×1290 torus arena. The world view is
+zoomed out (2304×1296 world units) so you see most of the arena at a glance,
+and the game window fills 80% of your browser width. HUD is a separate
+640×360 pixel-art overlay.
 
 ## Modes
 
@@ -28,13 +30,14 @@ The camera follows your ship across a 2796×1290 torus arena; the view is
 
 | Key | Action |
 |-----|--------|
-| Q | take the helm of the next ship (press repeatedly to cycle) |
+| F | take the helm of the next ship (press repeatedly to cycle) |
 | W / A / D | thrust / turn left / turn right |
+| Q / E | strafe left / right |
 | S | brake |
 | SPACE | fire |
 | SHIFT | special ability |
 | TAB | cycle target lock among hostiles |
-| E | release the helm back to the AI |
+| X | release the helm back to the AI |
 | G | show AI minds (targets, modes, line-of-sight) |
 | P | pause |
 | M | mute |

@@ -7,14 +7,26 @@ html, body {
 }
 body { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
 .wrap { display: flex; flex-direction: column; align-items: center; }
-#cv {
+.stage {
+  position: relative;
+  width: 80vw;               /* game uses 80% of the window width */
+  aspect-ratio: 16 / 9;
+  max-height: 86vh;          /* never overflow a short window */
+}
+.stage canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+#cv, #hud {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   background: #04060c;
-  border: 1px solid #1b2438;
-  box-shadow: 0 0 42px rgba(60, 120, 255, 0.14), 0 0 4px rgba(0,0,0,0.8);
   outline: none;
 }
+#cv { border: 1px solid #1b2438; box-shadow: 0 0 42px rgba(60, 120, 255, 0.14), 0 0 4px rgba(0,0,0,0.8); }
+#hud { pointer-events: none; }
 .hint {
   margin-top: 10px;
   font-size: 12px;

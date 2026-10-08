@@ -16,6 +16,7 @@
       this.shield = 0;
       this.wcd = 0; this.scd = 0;
       this.burn = 0; this.burnActive = false;
+      this.strafing = 0;
       this.mines = [];
       this.dead = false;
       this.hitT = 0;
@@ -36,6 +37,7 @@
       const want = this.human ? this.humanInput : this.ctrl;
       const thrust = want.thrust || 0;
       const turn = want.turn || 0;
+      const strafe = want.strafe || 0;   // Q/E lateral thrust
 
       this.thrusting = thrust > 0;
       this.ang += turn * s.turn * dt;
@@ -45,6 +47,15 @@
       if (accel) {
         this.vx += Math.cos(this.ang) * accel * dt;
         this.vy += Math.sin(this.ang) * accel * dt;
+      }
+      // strafe: lateral thrust at 60% power (keeps the nose authoritative)
+      if (strafe) {
+        const sa = s.accel * 0.6 * strafe;
+        this.vx += Math.cos(this.ang + Math.PI / 2) * sa * dt;
+        this.vy += Math.sin(this.ang + Math.PI / 2) * sa * dt;
+        this.strafing = strafe;
+      } else {
+        this.strafing = 0;
       }
       if (want.brake) {
         const v = U.len(this.vx, this.vy);
@@ -261,8 +272,8 @@
       const art = this.spec.art;
       const w = art[0].length, h = art.length;
       const e = U.eff(this.x, this.y);        // camera-space position
-      const PS = 2;                            // pixel scale for the 13x12 art
-      if (e.x < -20 || e.x > GM.VW + 20 || e.y < -20 || e.y > GM.VH + 20) return;   // culled
+      const PS = 3;                            // pixel scale for the 13x12 art
+      if (e.x < -20 || e.x > GM.WV + 20 || e.y < -20 || e.y > GM.WH + 20) return;   // culled
 
       if (this.shield > 0) {
         g.strokeStyle = '#8ef2ff';
