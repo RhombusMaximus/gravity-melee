@@ -1,9 +1,0 @@
-Gravity Melee v0.1.0 - gravity-well arcade space combat
-
-- Inverse-square gravity planet + orbiting moon, torus-wrapped 640x360 arena
-- 6 pixel-art ships with distinct weapons and specials
-- AI pilots: lead-prediction gunnery, slingshot waypoints, LOS-aware
-  modes (approach/engage/orbit/slingshot/recover), 6 personality archetypes
-- Gravity surge after 3 min ramps the well up to x3
-- Player possession: Q to take helm, WASD + Space/Shift, Tab to release
-- Modes: 1v1, 2v2, 3v3v3 - all-AI spectate or jump in any time
