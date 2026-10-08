@@ -19,14 +19,20 @@ body { display: flex; flex-direction: column; align-items: center; justify-conte
   width: 100%;
   height: 100%;
 }
-#cv, #hud {
+#cv {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  background: #04060c;
+  background: #04060c;          /* base layer owns the backdrop */
   outline: none;
 }
 #cv { border: 1px solid #1b2438; box-shadow: 0 0 42px rgba(60, 120, 255, 0.14), 0 0 4px rgba(0,0,0,0.8); }
-#hud { pointer-events: none; }
+#hud {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  background: transparent;      /* MUST be transparent: it floats over #cv */
+  outline: none;
+  pointer-events: none;
+}
 .hint {
   margin-top: 10px;
   font-size: 12px;
