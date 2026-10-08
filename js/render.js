@@ -269,7 +269,8 @@
       g.font = 'bold 8px monospace';
       g.textAlign = 'left';
       g.fillStyle = '#7fd4ff';
-      g.fillText('[Q] take the helm of a ship', 8, GM.VH - 8);
+      const p1 = GM.world ? GM.world.p1 : null;
+      g.fillText(p1 && !p1.dead ? 'P1 ' + p1.name.toUpperCase() + ' — [F] take the helm' : '[F] take the helm', 8, GM.VH - 8);
     }
 
     // ===== TARGET PANEL (upper right) =====
@@ -318,7 +319,8 @@
         g.fillStyle = s.dead ? '#39404f' : '#8fa2c0';
         let tag = s.dead ? ' ✝' : '';
         if (s.human) tag = ' ◆';
-        else if (me && s.team === me.team && !s.dead) tag = ' ▸';
+        else if (GM.world && GM.world.p1 === s) tag = ' ★';
+        else if (GM.playerTeam !== null && GM.playerTeam !== undefined && s.team === GM.playerTeam) tag = ' ▸';
         g.fillText(s.name + tag, 15, ry + 4);
       }
       ry -= 3;

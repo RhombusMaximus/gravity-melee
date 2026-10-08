@@ -47,16 +47,25 @@ and the game window fills 80% of your browser width. HUD is a separate
 
 ## Squadron control
 
-Your first F-press locks your team for the match. After that:
+You are **P1: the first ship of the first team** — the camera follows your
+squadron from the moment the match starts, no lock-in press needed.
 
 - **F cycles only your living ships** — the unheld ones fight as AI wingmen
-  (marked ▸ in the roster; you're ◆)
-- When your ship dies, the helm **auto-jumps to a living teammate** — you keep
-  flying until your whole squadron is down
+  (roster: ★ P1, ◆ you-at-the-helm, ▸ wingman)
+- When your ship dies, the helm **auto-jumps to a living teammate** (P1
+  preferred) — you keep flying until your whole squadron is down
 - **C** issues a focus-fire order: all wingmen lock your current target for
   12 seconds (retarget normally after)
 - **X** releases the helm to watch your squadron fight — the camera stays on
-  your team
+  a specific ship (your held ship, then P1, then a teammate), never a fuzzy
+  center-of-mass
+
+## Roadmap
+
+- **Online multiplayer** — next phase (WebRTC peer-to-peer or lightweight
+  relay; the sim is already deterministic-ish per fixed-step)
+- Ship-select screen & team building
+- Persistent pilot records (kills per archetype)
 
 ## HUD
 

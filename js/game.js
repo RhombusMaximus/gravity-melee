@@ -50,6 +50,9 @@
         }
         this.teams.push(teamShips);
       });
+
+      // Player 1: the first ship of the first team — camera & possession anchor
+      this.p1 = this.teams[0][0];
     }
 
     moonPos() {

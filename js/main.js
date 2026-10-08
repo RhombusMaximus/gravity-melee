@@ -72,22 +72,15 @@
   window.addEventListener('keyup', (e) => { keys[e.code] = false; });
 
   // ---------- possession ----------
-  // Squadron control: the FIRST ship you take locks your team for the match.
-  // F then cycles only among YOUR living ships; the unheld ones fly as AI
-  // wingmen. When your ship dies the helm auto-jumps to a living teammate.
+  // Squadron control: you are P1's team (first ship of first team) from match
+  // start. F cycles only your living ships; the unheld ones fly as AI wingmen.
+  // When your ship dies the helm auto-jumps to a living teammate.
   function possessNext() {
-    const alive = GM.world.ships.filter((s) => !s.dead);
-    if (!alive.length) return;
-
-    // first possession locks the player's team
-    if (GM.playerTeam === null || GM.playerTeam === undefined) {
-      GM.playerTeam = (GM.humanShip ? GM.humanShip.team : alive[0].team);
-    }
-
-    const mine = alive.filter((s) => s.team === GM.playerTeam);
+    const mine = GM.world.ships.filter((s) => !s.dead && s.team === GM.playerTeam);
     if (!mine.length) return;
 
     let idx = GM.humanShip ? mine.indexOf(GM.humanShip) : -1;
+    // first press: take P1 if unheld, else next living ship
     idx = (idx + 1) % mine.length;
     const target = mine[idx];
     if (GM.humanShip && GM.humanShip !== target) releaseShip(false);
@@ -101,20 +94,20 @@
   }
 
   // when the player's ship dies, hop to a living teammate instead of going
-  // to spectate (called from the step loop instead of releaseShip)
+  // to spectate (called from the step loop)
   function onPlayerShipDeath() {
     if (!GM.humanShip) return;
-    const deadShip = GM.humanShip;
     releaseShip(false);
-    if (GM.playerTeam === null || GM.playerTeam === undefined) return;
     const mine = GM.world.ships.filter((s) => !s.dead && s.team === GM.playerTeam);
-    if (mine.length) {
-      GM.humanShip = mine[0];
-      mine[0].human = true;
-      mine[0].ctrl = { thrust: 0, turn: 0, fire: false, special: false, brake: false };
-      mine[0].aiBrain = mine[0].aiBrain || GM.AI.mkBrain();
+    // prefer P1 if still alive, else the first living teammate
+    const next = (GM.world.p1 && !GM.world.p1.dead) ? GM.world.p1 : mine[0];
+    if (next) {
+      GM.humanShip = next;
+      next.human = true;
+      next.ctrl = { thrust: 0, turn: 0, fire: false, special: false, brake: false };
+      next.aiBrain = next.aiBrain || GM.AI.mkBrain();
       GM.A.SND.possess();
-      GM.FX.float(mine[0].x, mine[0].y - 18, 'HELM: ' + mine[0].name, '#fff');
+      GM.FX.float(next.x, next.y - 18, 'HELM: ' + next.name, '#fff');
       autoAcquireTarget();
     }
   }
@@ -194,7 +187,7 @@
     GM.paused = false;
     GM.humanShip = null;
     GM.humanTarget = null;
-    GM.playerTeam = null;      // reset squadron lock each match
+    GM.playerTeam = 0;         // P1 = first ship of first team; camera anchors here
     GM.FX.init();
     GM.R.init();
     GM.A.SND.ui();
@@ -214,30 +207,26 @@
   }
 
   // ---------- camera ----------
+  // camera always tracks ONE ship, never a fuzzy centroid:
+  // your held ship -> P1 (if alive) -> P1's first living teammate -> any survivor
+  function cameraAnchor() {
+    if (GM.humanShip && !GM.humanShip.dead) return GM.humanShip;
+    const w = GM.world;
+    if (!w) return null;
+    if (w.p1 && !w.p1.dead) return w.p1;
+    if (GM.playerTeam !== null && GM.playerTeam !== undefined) {
+      const mate = w.ships.find((s) => !s.dead && s.team === GM.playerTeam);
+      if (mate) return mate;
+    }
+    return w.ships.find((s) => !s.dead) || null;
+  }
+
   function updateCamera(dt) {
-    const me = GM.humanShip && !GM.humanShip.dead ? GM.humanShip : null;
+    const me = cameraAnchor();
     let fx, fy;
     if (me) {
       fx = me.x + me.vx * 0.35;      // lead the ship slightly with its velocity
       fy = me.y + me.vy * 0.35;
-    } else if (GM.world) {
-      // spectate: prefer your squadron's wrap-aware mean, else all living ships
-      const pool = (GM.playerTeam !== null && GM.playerTeam !== undefined)
-        ? GM.world.ships.filter((s) => !s.dead && s.team === GM.playerTeam)
-        : GM.world.ships.filter((s) => !s.dead);
-      const n = pool.length;
-      if (n) {
-        let cx = 0, cy = 0;
-        const ref = pool[0];
-        for (const s of pool) {
-          const w = U.wrapDelta(ref.x, ref.y, s.x, s.y);
-          cx += w.x; cy += w.y;
-        }
-        fx = U.wrapX(ref.x + cx / n);
-        fy = U.wrapY(ref.y + cy / n);
-      } else {
-        fx = GM.CAM.x; fy = GM.CAM.y;
-      }
     } else {
       fx = GM.CAM.x; fy = GM.CAM.y;
     }
@@ -308,11 +297,17 @@
       GM.SILENT = true;
       GM.demoWorld.step(1 / 60);
       GM.SILENT = false;
-      // auto-director camera follows the demo action
+      // camera follows the demo's P1 anchor (handled by cameraAnchor)
       const savedHuman = GM.humanShip;
+      const savedWorld = GM.world;
+      const savedTeam = GM.playerTeam;
       GM.humanShip = null;
+      GM.world = GM.demoWorld;
+      GM.playerTeam = 0;
       updateCamera(1 / 60);
       GM.humanShip = savedHuman;
+      GM.world = savedWorld;
+      GM.playerTeam = savedTeam;
       GM.R.drawWorld(g, GM.demoWorld, t);
     }
     g.restore();
