@@ -316,7 +316,10 @@
         g.fillStyle = s.dead ? '#39404f' : T.P;
         g.fillRect(8, ry, 4, 4);
         g.fillStyle = s.dead ? '#39404f' : '#8fa2c0';
-        g.fillText(s.name + (s.dead ? ' ✝' : ''), 15, ry + 4);
+        let tag = s.dead ? ' ✝' : '';
+        if (s.human) tag = ' ◆';
+        else if (me && s.team === me.team && !s.dead) tag = ' ▸';
+        g.fillText(s.name + tag, 15, ry + 4);
       }
       ry -= 3;
     }
@@ -339,11 +342,12 @@
     // ===== BOTTOM status =====
     g.textAlign = 'right';
     g.fillStyle = '#55688a';
-    g.fillText('SPD ×' + GM.speed + (GM.paused ? '  [PAUSED]' : '') + (GM.debugAI ? '  [AI]' : ''), GM.VW - 6, GM.VH - 6);
+    const volPct = Math.round(GM.A.vol * 100 / 0.6);
+    g.fillText('SPD ×' + GM.speed + (GM.paused ? '  [PAUSED]' : '') + (GM.debugAI ? '  [AI]' : '') + '  VOL ' + (GM.A.muted ? 'OFF' : volPct + '%') + ' [ ]', GM.VW - 6, GM.VH - 6);
     if (me && !me.dead) {
       g.textAlign = 'left';
       g.fillStyle = '#7488a8';
-      g.fillText('[X] release helm  ·  [TAB] cycle target', 8, GM.VH - 6);
+      g.fillText('[X] release helm  ·  [TAB] cycle target  ·  [C] wingmen: focus fire', 8, GM.VH - 6);
     }
     g.textAlign = 'left';
   };
@@ -413,8 +417,8 @@
     g.font = '8px monospace';
     g.fillStyle = '#55688a';
     g.fillText('[1] 1v1    [2] 2v2    [3] 3v3v3', GM.VW / 2, 168);
-    g.fillText('F take helm · WASD fly · Q/E strafe · SPACE fire · SHIFT special', GM.VW / 2, 196);
-    g.fillText('TAB cycle targets · X release helm · G AI minds · P pause · M mute · -/= sim speed', GM.VW / 2, 210);
+    g.fillText('F take helm (your team) · WASD fly · Q/E strafe · SPACE fire · SHIFT special', GM.VW / 2, 196);
+    g.fillText('TAB cycle targets · X release helm · C wingmen focus fire · G minds · P pause · M mute · [ ] volume', GM.VW / 2, 210);
     g.fillStyle = '#3c4a66';
     g.fillText('v' + GM.VERSION + ' — a love letter to Star Control II melee', GM.VW / 2, GM.VH - 14);
     g.textAlign = 'left';

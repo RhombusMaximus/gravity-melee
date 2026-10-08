@@ -18,6 +18,7 @@
     tgt: null,
     los: true,
     lapDir: U.randSign(),
+    orderT: 0,          // squadron focus-fire order remaining (seconds)
   });
 
   function dist2(s, a) {
@@ -130,8 +131,15 @@
     b.modeT += dt;
     b.jinkT -= dt;
     b.retargetT -= dt;
+    b.orderT = Math.max(0, (b.orderT || 0) - dt);
 
-    if (!b.tgt || b.tgt.dead || b.retargetT <= 0) {
+    // focus-fire order: keep the assigned lock until it expires or target dies
+    if (b.orderT > 0) {
+      if (!b.tgt || b.tgt.dead) {
+        b.tgt = pickTarget(s, world);
+        b.retargetT = b.orderT;
+      }
+    } else if (!b.tgt || b.tgt.dead || b.retargetT <= 0) {
       b.tgt = pickTarget(s, world);
       b.retargetT = 2 + U.rand(2);
     }

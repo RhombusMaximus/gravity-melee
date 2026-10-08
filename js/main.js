@@ -31,6 +31,12 @@
 
     // global keys
     if (c === 'KeyM') { GM.A.toggleMute(); return; }
+    if (c === 'BracketLeft' || c === 'BracketRight') {
+      if (c === 'BracketLeft') GM.A.volDown();
+      else GM.A.volUp();
+      GM.A.SND.ui();
+      return;
+    }
     if (c === 'KeyP' && GM.state === 'play') { GM.paused = !GM.paused; GM.A.SND.ui(); return; }
     if (c === 'KeyG') { GM.debugAI = !GM.debugAI; return; }
     if (c === 'Minus' || c === 'Equal') {
@@ -58,24 +64,32 @@
       if (c === 'KeyF') possessNext();
       else if (c === 'KeyX') releaseShip();
       else if (c === 'Tab') cycleTarget();
-      else if (c === 'Escape') { GM.state = 'title'; GM.world = null; GM.humanShip = null; GM.humanTarget = null; }
+      else if (c === 'KeyC') orderFocusFire();
+      else if (c === 'Escape') { GM.state = 'title'; GM.world = null; GM.humanShip = null; GM.humanTarget = null; GM.playerTeam = null; }
     }
   });
 
   window.addEventListener('keyup', (e) => { keys[e.code] = false; });
 
   // ---------- possession ----------
+  // Squadron control: the FIRST ship you take locks your team for the match.
+  // F then cycles only among YOUR living ships; the unheld ones fly as AI
+  // wingmen. When your ship dies the helm auto-jumps to a living teammate.
   function possessNext() {
     const alive = GM.world.ships.filter((s) => !s.dead);
     if (!alive.length) return;
-    let idx = GM.humanShip ? alive.indexOf(GM.humanShip) : -1;
-    idx = (idx + 1) % alive.length;      // cycle through ships
-    const s = alive[idx];
-    // if cycling lands on current ship and there are others, skip forward once
-    if (s === GM.humanShip && alive.length > 1) {
-      idx = (idx + 1) % alive.length;
+
+    // first possession locks the player's team
+    if (GM.playerTeam === null || GM.playerTeam === undefined) {
+      GM.playerTeam = (GM.humanShip ? GM.humanShip.team : alive[0].team);
     }
-    const target = alive[idx];
+
+    const mine = alive.filter((s) => s.team === GM.playerTeam);
+    if (!mine.length) return;
+
+    let idx = GM.humanShip ? mine.indexOf(GM.humanShip) : -1;
+    idx = (idx + 1) % mine.length;
+    const target = mine[idx];
     if (GM.humanShip && GM.humanShip !== target) releaseShip(false);
     GM.humanShip = target;
     target.human = true;
@@ -86,6 +100,48 @@
     autoAcquireTarget();
   }
 
+  // when the player's ship dies, hop to a living teammate instead of going
+  // to spectate (called from the step loop instead of releaseShip)
+  function onPlayerShipDeath() {
+    if (!GM.humanShip) return;
+    const deadShip = GM.humanShip;
+    releaseShip(false);
+    if (GM.playerTeam === null || GM.playerTeam === undefined) return;
+    const mine = GM.world.ships.filter((s) => !s.dead && s.team === GM.playerTeam);
+    if (mine.length) {
+      GM.humanShip = mine[0];
+      mine[0].human = true;
+      mine[0].ctrl = { thrust: 0, turn: 0, fire: false, special: false, brake: false };
+      mine[0].aiBrain = mine[0].aiBrain || GM.AI.mkBrain();
+      GM.A.SND.possess();
+      GM.FX.float(mine[0].x, mine[0].y - 18, 'HELM: ' + mine[0].name, '#fff');
+      autoAcquireTarget();
+    }
+  }
+
+  // ---------- squadron orders ----------
+  // C = focus fire: all AI wingmen on your team lock your current target
+  // for the next 12 seconds.
+  function orderFocusFire() {
+    const me = GM.humanShip;
+    const tgt = GM.humanTarget;
+    if (!me || !tgt || tgt.dead) return;
+    let n = 0;
+    for (const s of GM.world.ships) {
+      if (s.dead || s.team !== me.team || s === me) continue;
+      if (s.aiBrain) {
+        s.aiBrain.tgt = tgt;
+        s.aiBrain.orderT = 12;         // seconds of forced lock
+        s.aiBrain.retargetT = 12;      // suppress normal retargeting while ordered
+        n++;
+      }
+    }
+    if (n) {
+      GM.A.SND.ui();
+      GM.FX.float(me.x, me.y - 30, n + 'x FOCUS: ' + tgt.name, GM.TEAMS[me.team].glow);
+    }
+  }
+
   function releaseShip(playSound = true) {
     if (!GM.humanShip) return;
     const s = GM.humanShip;
@@ -94,6 +150,8 @@
     s.ctrl = { thrust: 0, turn: 0, fire: false, special: false, brake: false };
     GM.humanShip = null;
     GM.humanTarget = null;
+    // NOTE: playerTeam is intentionally NOT cleared — X releases the helm but
+    // keeps your squadron; the camera stays on your team via spectate
     if (playSound) GM.A.SND.ui();
   }
 
@@ -136,6 +194,7 @@
     GM.paused = false;
     GM.humanShip = null;
     GM.humanTarget = null;
+    GM.playerTeam = null;      // reset squadron lock each match
     GM.FX.init();
     GM.R.init();
     GM.A.SND.ui();
@@ -162,18 +221,15 @@
       fx = me.x + me.vx * 0.35;      // lead the ship slightly with its velocity
       fy = me.y + me.vy * 0.35;
     } else if (GM.world) {
-      // auto-director: follow the geometric center of living ships
-      let sx = 0, sy = 0, n = 0;
-      for (const s of GM.world.ships) {
-        if (s.dead) continue;
-        sx += s.x; sy += s.y; n++;
-      }
+      // spectate: prefer your squadron's wrap-aware mean, else all living ships
+      const pool = (GM.playerTeam !== null && GM.playerTeam !== undefined)
+        ? GM.world.ships.filter((s) => !s.dead && s.team === GM.playerTeam)
+        : GM.world.ships.filter((s) => !s.dead);
+      const n = pool.length;
       if (n) {
-        // wrap-aware mean
         let cx = 0, cy = 0;
-        const ref = GM.world.ships.find((s) => !s.dead);
-        for (const s of GM.world.ships) {
-          if (s.dead) continue;
+        const ref = pool[0];
+        for (const s of pool) {
           const w = U.wrapDelta(ref.x, ref.y, s.x, s.y);
           cx += w.x; cy += w.y;
         }
@@ -211,8 +267,8 @@
       let winnerJustSet = false;
       while (acc >= STEP && steps < 8) {
         GM.world.step(STEP);
-        // death mid-step: release helm (world keeps its target refs)
-        if (GM.humanShip && GM.humanShip.dead) { releaseShip(false); }
+        // death mid-step: hop the helm to a living teammate (squadron)
+        if (GM.humanShip && GM.humanShip.dead) { onPlayerShipDeath(); }
         if (GM.world.winner !== null && GM.state === 'play') {
           GM.state = 'victory';
           GM.A.SND.victory();

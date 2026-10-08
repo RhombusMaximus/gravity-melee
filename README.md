@@ -30,18 +30,33 @@ and the game window fills 80% of your browser width. HUD is a separate
 
 | Key | Action |
 |-----|--------|
-| F | take the helm of the next ship (press repeatedly to cycle) |
+| F | take the helm — first press locks YOUR team; F again cycles your ships |
 | W / A / D | thrust / turn left / turn right |
 | Q / E | strafe left / right |
 | S | brake |
 | SPACE | fire |
 | SHIFT | special ability |
 | TAB | cycle target lock among hostiles |
-| X | release the helm back to the AI |
+| C | order your AI wingmen to focus-fire your current target (12s) |
+| X | release the helm back to the AI (spectates your team) |
 | G | show AI minds (targets, modes, line-of-sight) |
 | P | pause |
 | M | mute |
+| [ / ] | volume down / up |
 | - / = | simulation speed ×0.25 … ×4 |
+
+## Squadron control
+
+Your first F-press locks your team for the match. After that:
+
+- **F cycles only your living ships** — the unheld ones fight as AI wingmen
+  (marked ▸ in the roster; you're ◆)
+- When your ship dies, the helm **auto-jumps to a living teammate** — you keep
+  flying until your whole squadron is down
+- **C** issues a focus-fire order: all wingmen lock your current target for
+  12 seconds (retarget normally after)
+- **X** releases the helm to watch your squadron fight — the camera stays on
+  your team
 
 ## HUD
 

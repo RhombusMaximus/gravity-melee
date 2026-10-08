@@ -8,12 +8,16 @@
     if (!AC) return null;
     A.ctx = new AC();
     A.master = A.ctx.createGain();
-    A.master.gain.value = 0.22;
+    A.master.gain.value = A.vol;
     A.master.connect(A.ctx.destination);
     return A.ctx;
   };
   A.resume = () => { if (A.ctx && A.ctx.state === 'suspended') A.ctx.resume(); };
-  A.toggleMute = () => { A.muted = !A.muted; if (A.master) A.master.gain.value = A.muted ? 0 : 0.22; return A.muted; };
+  A.toggleMute = () => { A.muted = !A.muted; if (A.master) A.master.gain.value = A.muted ? 0 : A.vol; return A.muted; };
+  A.vol = 0.22;
+  A.volStep = 0.04;
+  A.volUp = () => { A.vol = Math.min(0.6, +(A.vol + A.volStep).toFixed(2)); if (!A.muted && A.master) A.master.gain.value = A.vol; return A.vol; };
+  A.volDown = () => { A.vol = Math.max(0, +(A.vol - A.volStep).toFixed(2)); if (!A.muted && A.master) A.master.gain.value = A.vol; return A.vol; };
 
   // generic tone
   function tone(freq, dur, type, vol, slide, delay = 0) {
