@@ -150,6 +150,38 @@
       GM.FX.emit(ms.x, ms.y, 1, { spd: 6, life: 0.4, col: '#6a7080', size: 1 });
     }
 
+    // fighters (Kzer-Za interceptors): tiny team darts + laser beams
+    for (const f of world.fighters) {
+      if (f.dead) continue;
+      const e = U.eff(f.x, f.y);
+      if (e.x < -8 || e.x > GM.WV + 8 || e.y < -8 || e.y > GM.WH + 8) continue;
+      const fz = Math.max(1, zs);
+      if (f.beamT > 0) {
+        g.strokeStyle = '#ffe98a';
+        g.globalAlpha = Math.min(1, f.beamT / 0.12);
+        g.lineWidth = Math.max(1, fz * 0.8);
+        g.beginPath();
+        g.moveTo(e.x, e.y);
+        g.lineTo(e.x + Math.cos(f.beamAng) * f.beamLen * zs,
+                 e.y + Math.sin(f.beamAng) * f.beamLen * zs);
+        g.stroke();
+        g.globalAlpha = 1;
+        g.lineWidth = 1;
+      }
+      g.save();
+      g.translate(e.x, e.y);
+      g.rotate(f.ang + Math.PI / 2);
+      g.fillStyle = GM.TEAMS[f.team].P;
+      g.fillRect(-1.5 * fz, -2 * fz, 3 * fz, 5 * fz);
+      g.fillStyle = '#7cff5e';
+      g.fillRect(-1 * fz, -3.5 * fz, 2 * fz, 1.5 * fz);
+      if (U.chance(0.6)) {
+        g.fillStyle = '#ffca7a';
+        g.fillRect(-0.5 * fz, 3 * fz, 1 * fz, 1.5 * fz);
+      }
+      g.restore();
+    }
+
     // ships
     for (const s of world.ships) s.draw(g, t);
 
@@ -260,9 +292,15 @@
       g.fillRect(8, y + 5, Math.round(110 * me.batt / me.battMax), 3);
       y += 12;
       const sp = me.spec.special;
-      const ready = me.scd <= 0 && me.batt >= sp.cost;
+      let ready = me.scd <= 0 && me.batt >= sp.cost;
+      let why = '';
+      if (sp.type === 'fighters') {
+        const airborne = world.fighters.filter((f) => f.by === me).length;
+        if (airborne > 0) { ready = false; why = ' [DECK BUSY ×' + airborne + ']'; }
+        else if (me.crew <= 1) { ready = false; why = ' [NO SPARE CREW]'; }
+      }
       g.fillStyle = ready ? '#8ef2ff' : '#5a6478';
-      g.fillText('SP ' + sp.label + (ready ? ' [READY]' : ''), 8, y + 4);
+      g.fillText('SP ' + sp.label + (ready ? ' [READY]' : why), 8, y + 4);
       y += 10;
       // target lock warning — subtle amber pulse (never fully invisible)
       if (lockedBy.length) {
@@ -382,6 +420,11 @@
       const px = mx + s.x * sx, py = my + s.y * sy;
       g.fillRect(px - 1, py - 1, s.human ? 3 : 2, s.human ? 3 : 2);
     }
+    for (const f of world.fighters) {
+      if (f.dead) continue;
+      g.fillStyle = GM.TEAMS[f.team].P;
+      g.fillRect(mx + f.x * sx, my + f.y * sy, 1, 1);
+    }
     const tgt = GM.humanTarget;
     if (tgt && !tgt.dead) {
       g.strokeStyle = GM.TEAMS[tgt.team].P;
@@ -407,6 +450,30 @@
     g.fillRect(0, 0, GM.VW, GM.VH);
   };
 
+  // standalone pixel-sprite renderer (select screen; art chars, nose up)
+  function drawSprite(g, spec, x, y, px, team) {
+    const art = spec.art;
+    const w = art[0].length, h = art.length;
+    const T = team !== null && team !== undefined ? GM.TEAMS[team] : { P: '#3fc8ff', S: '#155a9e' };
+    g.save();
+    g.translate(x, y);
+    for (let r = 0; r < h; r++) {
+      const row = art[r];
+      for (let c = 0; c < w; c++) {
+        const ch = row[c];
+        if (ch === '.') continue;
+        let col = GM.CHARS[ch];
+        if (ch === 'P') col = T.P;
+        else if (ch === 'S') col = T.S;
+        if (!col) continue;
+        g.fillStyle = col;
+        g.fillRect(Math.round((c - w / 2) * px), Math.round((r - h / 2) * px), px, px);
+      }
+    }
+    g.restore();
+  }
+  R.drawSprite = drawSprite;
+
   R.title = (g, t) => {
     R.dim(g, 0.55);
     g.textAlign = 'center';
@@ -422,15 +489,91 @@
     if (blink) {
       g.font = 'bold 11px monospace';
       g.fillStyle = '#fff';
-      g.fillText('PRESS  1 · 2 · 3  TO START A MELEE', GM.VW / 2, 150);
+      g.fillText('PRESS  1 · 2 · 3  TO ASSEMBLE A FLEET', GM.VW / 2, 150);
     }
     g.font = '8px monospace';
     g.fillStyle = '#55688a';
-    g.fillText('[1] 1v1    [2] 2v2    [3] 3v3v3', GM.VW / 2, 168);
+    g.fillText('[1] 1v1 · 30 pts    [2] 2v2 · 50 pts    [3] 3v3v3 · 66 pts', GM.VW / 2, 168);
     g.fillText('F take helm (your team) · WASD fly · Q/E strafe · SPACE fire · SHIFT special', GM.VW / 2, 196);
     g.fillText('TAB cycle targets · X release helm · C wingmen focus fire · G minds · P pause · M mute · [ ] volume', GM.VW / 2, 210);
     g.fillStyle = '#3c4a66';
     g.fillText('v' + GM.VERSION + ' — a love letter to Star Control II melee', GM.VW / 2, GM.VH - 14);
+    g.textAlign = 'left';
+  };
+
+  // ---------- fleet assembly (ship select) ----------
+  R.select = (g, t, sel) => {
+    R.dim(g, 0.72);
+    const mode = sel.mode;
+    const budget = mode.budget;
+    const spent = sel.idx.reduce((a, j) => a + GM.SHIPS[j].cost, 0);
+
+    g.textAlign = 'center';
+    g.font = 'bold 16px monospace';
+    g.fillStyle = '#7fd4ff';
+    g.fillText('FLEET ASSEMBLY', GM.VW / 2, 32);
+    g.font = '9px monospace';
+    g.fillStyle = '#8fa2c0';
+    g.fillText(mode.label + '  ·  AZURE squadron  ·  every team flies under the same point budget', GM.VW / 2, 46);
+
+    // budget bar
+    const bw = 220, bx = GM.VW / 2 - bw / 2, by = 56;
+    g.fillStyle = '#1a2030';
+    g.fillRect(bx, by, bw, 5);
+    g.fillStyle = spent > budget ? '#ff5648' : '#ffd85e';
+    g.fillRect(bx, by, Math.round(bw * Math.min(1, spent / budget)), 5);
+    g.font = '8px monospace';
+    g.fillStyle = spent > budget ? '#ff5648' : '#8fa2c0';
+    g.fillText('BUDGET  ' + spent + ' / ' + budget + ' PTS', GM.VW / 2, by + 14);
+
+    // slots
+    for (let i = 0; i < sel.idx.length; i++) {
+      const y = 94 + i * 58;
+      const cur = i === sel.cur;
+      const spec = GM.SHIPS[sel.idx[i]];
+      if (cur) {
+        g.strokeStyle = '#7fd4ff';
+        g.globalAlpha = 0.55 + 0.35 * Math.sin(t * 6);
+      } else {
+        g.strokeStyle = '#2a3450';
+        g.globalAlpha = 1;
+      }
+      g.strokeRect(56, y - 16, GM.VW - 112, 52);
+      g.globalAlpha = 1;
+
+      drawSprite(g, spec, 92, y + 10, 2, 0);
+
+      g.textAlign = 'left';
+      g.font = 'bold 9px monospace';
+      g.fillStyle = cur ? '#fff' : '#aebdd6';
+      g.fillText(spec.name + '  ·  ' + spec.role.toUpperCase(), 122, y - 2);
+      g.font = '8px monospace';
+      g.fillStyle = '#6f81a0';
+      g.fillText(spec.weapon.label + ' / ' + spec.special.label +
+        '  ·  crew ' + spec.crew + ' · batt ' + spec.batt, 122, y + 10);
+      g.textAlign = 'right';
+      g.font = 'bold 11px monospace';
+      let others = 0;
+      sel.idx.forEach((j, k) => { if (k !== i) others += GM.SHIPS[j].cost; });
+      g.fillStyle = (others + spec.cost > budget) ? '#ff5648' : '#ffd85e';
+      g.fillText(spec.cost + ' PTS', GM.VW - 68, y + 8);
+      g.textAlign = 'center';
+    }
+
+    // roster reference line
+    g.font = '8px monospace';
+    g.fillStyle = '#55688a';
+    g.fillText(GM.SHIPS.map((s) => s.key.toUpperCase() + ' ' + s.cost).join(' · '), GM.VW / 2, GM.VH - 40);
+
+    const blink = Math.sin(t * 3) > -0.3;
+    if (blink) {
+      g.font = 'bold 11px monospace';
+      g.fillStyle = '#fff';
+      g.fillText('[ENTER] DEPLOY', GM.VW / 2, GM.VH - 22);
+    }
+    g.font = '8px monospace';
+    g.fillStyle = '#55688a';
+    g.fillText('A/D cycle ship · W/S pick slot · R random loadout · ESC back', GM.VW / 2, GM.VH - 10);
     g.textAlign = 'left';
   };
 

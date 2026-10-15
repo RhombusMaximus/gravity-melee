@@ -47,9 +47,21 @@
     }
 
     if (GM.state === 'title') {
-      if (c === 'Digit1') startGame(GM.MODES[0]);
-      else if (c === 'Digit2') startGame(GM.MODES[1]);
-      else if (c === 'Digit3') startGame(GM.MODES[2]);
+      if (c === 'Digit1') enterSelect(GM.MODES[0]);
+      else if (c === 'Digit2') enterSelect(GM.MODES[1]);
+      else if (c === 'Digit3') enterSelect(GM.MODES[2]);
+      return;
+    }
+
+    if (GM.state === 'select' && GM.sel) {
+      const sel = GM.sel;
+      if (c === 'Escape') { GM.state = 'title'; GM.sel = null; }
+      else if (c === 'KeyA' || c === 'ArrowLeft') cycleSlot(sel, -1);
+      else if (c === 'KeyD' || c === 'ArrowRight') cycleSlot(sel, 1);
+      else if (c === 'KeyW' || c === 'ArrowUp') { sel.cur = (sel.cur + sel.idx.length - 1) % sel.idx.length; GM.A.SND.ui(); }
+      else if (c === 'KeyS' || c === 'ArrowDown') { sel.cur = (sel.cur + 1) % sel.idx.length; GM.A.SND.ui(); }
+      else if (c === 'KeyR') { randomLoadout(sel); GM.A.SND.ui(); }
+      else if (c === 'Enter' || c === 'KeyF') deploySelection();
       return;
     }
 
@@ -180,9 +192,51 @@
     GM.FX.float(GM.humanTarget.x, GM.humanTarget.y - 18, 'TGT: ' + GM.humanTarget.name, GM.TEAMS[GM.humanTarget.team].P);
   }
 
+  // ---------- fleet assembly (ship select) ----------
+  // Super Melee style: every ship has a point cost; your team must fit the
+  // mode's budget. Unpicked slots (and enemy teams) auto-fill under it.
+  function affordable(sel, slotIdx, shipIdx) {
+    let sum = 0;
+    sel.idx.forEach((j, k) => { if (k !== slotIdx) sum += GM.SHIPS[j].cost; });
+    return sum + GM.SHIPS[shipIdx].cost <= sel.mode.budget;
+  }
+
+  function cycleSlot(sel, dir) {
+    const n = GM.SHIPS.length;
+    let j = sel.idx[sel.cur];
+    for (let step = 0; step < n; step++) {
+      j = (j + dir + n) % n;
+      if (affordable(sel, sel.cur, j)) { sel.idx[sel.cur] = j; GM.A.SND.ui(); return; }
+    }
+  }
+
+  function randomLoadout(sel) {
+    for (let k = 0; k < sel.idx.length; k++) {
+      const afford = [];
+      GM.SHIPS.forEach((s, j) => { if (affordable(sel, k, j)) afford.push(j); });
+      if (afford.length) sel.idx[k] = U.pick(afford);
+    }
+  }
+
+  function enterSelect(mode) {
+    const sel = { mode, cur: 0, idx: [] };
+    for (let i = 0; i < mode.teams[0]; i++) sel.idx.push(0);
+    randomLoadout(sel);
+    GM.sel = sel;
+    GM.state = 'select';
+    GM.A.SND.ui();
+  }
+
+  function deploySelection() {
+    const sel = GM.sel;
+    const picks = [sel.idx.map((j) => GM.SHIPS[j].key)];
+    startGame(sel.mode, picks);
+    GM.sel = null;
+  }
+
   // ---------- game flow ----------
-  function startGame(mode) {
-    GM.world = new GM.World(mode, {});
+  function startGame(mode, picks) {
+    GM.world = new GM.World(mode, picks ? { picks } : {});
     GM.state = 'play';
     GM.paused = false;
     GM.humanShip = null;
@@ -343,6 +397,8 @@
       } else {
         GM.R.victory(hg, GM.world);
       }
+    } else if (GM.state === 'select' && GM.sel) {
+      GM.R.select(hg, t, GM.sel);
     } else {
       GM.R.title(hg, t);
     }

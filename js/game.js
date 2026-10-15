@@ -4,9 +4,9 @@
 
   const SHOT_COL = {
     dart: '#8ef2ff', bolt: '#ffd070', plasma: '#ff9040',
-    shot: '#ff9ad0', lob: '#b6ff9e', pellet: '#e8e0ff',
+    shot: '#ff9ad0', lob: '#b6ff9e', pellet: '#e8e0ff', fusion: '#9dff5e',
   };
-  const SHOT_GRAV = { dart: 0.25, bolt: 0.3, plasma: 0.8, shot: 0.25, lob: 1.0, pellet: 0.25 };
+  const SHOT_GRAV = { dart: 0.25, bolt: 0.3, plasma: 0.8, shot: 0.25, lob: 1.0, pellet: 0.25, fusion: 0.35 };
   const S2 = GM.SCALE;
 
   class World {
@@ -20,6 +20,7 @@
       this.surged = false;
       this.winner = null;      // null = ongoing, -1 = draw, else team idx
       this.ships = [];
+      this.fighters = [];      // Kzer-Za autonomous interceptors
       this.teams = [];
 
       const P = GM.PHYS.planet;
@@ -29,8 +30,21 @@
 
       mode.teams.forEach((count, ti) => {
         const teamShips = [];
+        // Fleet building: picks[ti] is an explicit list of ship keys (the
+        // player's select screen). Unpicked slots auto-fill with random ships
+        // that fit the mode's point budget.
+        const teamPicks = (opts && opts.picks && opts.picks[ti]) || null;
+        const budget = mode.budget || Infinity;
+        let spent = 0;
         for (let i = 0; i < count; i++) {
-          const spec = GM.SHIPS[(Math.random() * GM.SHIPS.length) | 0];
+          let spec = null;
+          const key = teamPicks && teamPicks[i];
+          if (key) spec = GM.SHIPS.find((s) => s.key === key) || null;
+          if (!spec) {
+            const afford = GM.SHIPS.filter((s) => s.cost <= budget - spent);
+            spec = afford.length ? U.pick(afford) : GM.SHIPS[0];
+          }
+          spent += spec.cost;
           const arch = U.pick(GM.ARCHETYPES);
           const s = new GM.Ship(spec, ti, pilots[pi++ % pilots.length], arch);
           // spawn: ring around planet, teams spread, slight per-ship offset
@@ -165,6 +179,16 @@
           s.damage(dmg * k, by, this, kind || 'blast');
         }
       }
+      // blasts kill fighters too (single hit point)
+      for (let j = this.fighters.length - 1; j >= 0; j--) {
+        const f = this.fighters[j];
+        if (f.dead || (by && f.team === by.team)) continue;
+        const fw = U.wrapDelta(x, y, f.x, f.y);
+        if (U.len(fw.x, fw.y) < rad + 3) {
+          f.dead = true;
+          GM.FX.emit(f.x, f.y, 8, { spd: 70, life: 0.4, col: '#ffd28a', size: 2 });
+        }
+      }
     }
 
     step(dt) {
@@ -258,6 +282,20 @@
             }
           }
         }
+        // fighters: one enemy hit kills a fighter (they have a single hit point)
+        if (!dead) {
+          for (const f of this.fighters) {
+            if (f.dead || f.team === sh.team) continue;
+            const fw = U.wrapDelta(sh.x, sh.y, f.x, f.y);
+            if (U.len(fw.x, fw.y) < 4 + sh.size * 0.5) {
+              f.dead = true;
+              GM.FX.emit(f.x, f.y, 8, { spd: 70, life: 0.4, col: '#ffd28a', size: 2 });
+              GM.A.SND.hit();
+              dead = true;
+              break;
+            }
+          }
+        }
         if (dead) this.shots.splice(i, 1);
       }
 
@@ -318,6 +356,138 @@
         if (dead) this.missiles.splice(i, 1);
       }
 
+      // fighters (UQ-42 Kzer-Za autonomous interceptors)
+      // Behavior follows the Ur-Quan Dreadnought binary: chase + laser, turn
+      // for home late in life, dock to refund the crew member, ricochet off
+      // planets/moons (they never die to gravity masses), die to any enemy hit.
+      for (let i = this.fighters.length - 1; i >= 0; i--) {
+        const f = this.fighters[i];
+        if (f.dead) { this.fighters.splice(i, 1); continue; }
+        const sp = (f.by && f.by.spec) ? f.by.spec.special : null;
+        f.life -= dt;
+        f.laserCd = Math.max(0, f.laserCd - dt);
+        if (f.beamT > 0) f.beamT -= dt;
+        f.retgtT -= dt;
+        let dead = f.life <= 0;
+        const hasHome = f.by && !f.by.dead;
+        const goingHome = f.life < 1.8;      // FIGHTER_LIFE - TRACK_THRESHOLD
+
+        if (!dead) {
+          // retarget: nearest enemy (or nothing when heading home)
+          if (f.retgtT <= 0 || !f.tgt || f.tgt.dead || f.tgt.spawnProt > 0) {
+            f.retgtT = 0.3;
+            f.tgt = null;
+            if (!goingHome || !hasHome) {
+              let bd = 1e9;
+              for (const s of this.ships) {
+                if (s.dead || s.team === f.team || s.spawnProt > 0) continue;
+                const w = U.wrapDelta(f.x, f.y, s.x, s.y);
+                const d = U.len(w.x, w.y);
+                if (d < bd) { bd = d; f.tgt = s; }
+              }
+            }
+          }
+
+          // steer: home late in life, else lead-pursue the target
+          let gx, gy;
+          if (goingHome && hasHome) { gx = f.by.x; gy = f.by.y; }
+          else if (f.tgt) {
+            const w0 = U.wrapDelta(f.x, f.y, f.tgt.x, f.tgt.y);
+            const t0 = U.len(w0.x, w0.y) / 300;
+            gx = f.tgt.x + f.tgt.vx * t0 * 0.5;
+            gy = f.tgt.y + f.tgt.vy * t0 * 0.5;
+          }
+          if (gx !== undefined) {
+            const w = U.wrapDelta(f.x, f.y, gx, gy);
+            const diff = U.angDiff(f.ang, U.ang(w.x, w.y));
+            f.ang += U.clamp(diff, -4.2 * dt, 4.2 * dt);
+          }
+
+          // thrust + gravity (fighters swirl in the well, a bit lighter)
+          f.vx += Math.cos(f.ang) * 320 * dt;
+          f.vy += Math.sin(f.ang) * 320 * dt;
+          const fv = U.len(f.vx, f.vy);
+          const fmax = (sp && sp.fspeed) || 250;
+          if (fv > fmax) { const k = fmax / fv; f.vx *= k; f.vy *= k; }
+          const gv = this.gravityAt(f.x, f.y);
+          f.vx += gv.x * 0.6 * dt;
+          f.vy += gv.y * 0.6 * dt;
+          f.x = U.wrapX(f.x + f.vx * dt);
+          f.y = U.wrapY(f.y + f.vy * dt);
+
+          // laser strike: short-range instant beam (FIGHTER_ZAP)
+          if (sp && f.tgt && !f.tgt.dead && f.laserCd <= 0 && !(goingHome && hasHome)) {
+            const w = U.wrapDelta(f.x, f.y, f.tgt.x, f.tgt.y);
+            const d = U.len(w.x, w.y);
+            if (d < sp.laserRange + f.tgt.r) {
+              f.laserCd = sp.laserCd;
+              f.beamT = 0.12;
+              f.beamAng = U.ang(w.x, w.y);
+              f.beamLen = d;
+              f.tgt.damage(sp.laserDmg, f.by, this, 'shot');
+              if (f.by) f.by.totalHits++;
+              GM.A.SND.laser();
+            }
+          }
+
+          // dock: touch the mothership late in life -> refund the crew member
+          if (!dead && goingHome && hasHome) {
+            const w = U.wrapDelta(f.x, f.y, f.by.x, f.by.y);
+            if (U.len(w.x, w.y) < f.by.r + 8) {
+              f.by.crew = Math.min(f.by.crewMax, f.by.crew + 1);
+              GM.FX.float(f.by.x, f.by.y - 18, '+1 CREW', '#9dff7a');
+              GM.FX.emit(f.x, f.y, 6, { spd: 40, life: 0.4, col: '#9dff7a', size: 1.5 });
+              GM.A.SND.possess();
+              dead = true;
+            }
+          }
+
+          // ram an enemy ship: the fighter dies dealing a crew hit
+          if (!dead) {
+            for (const s of this.ships) {
+              if (s.dead || s.team === f.team || s.spawnProt > 0) continue;
+              const w = U.wrapDelta(f.x, f.y, s.x, s.y);
+              if (U.len(w.x, w.y) < s.r + 4) {
+                s.damage(2, f.by, this, 'shot');
+                GM.FX.emit(f.x, f.y, 10, { spd: 80, life: 0.4, col: '#ffd28a', size: 2 });
+                dead = true;
+                break;
+              }
+            }
+          }
+
+          // planet & moon: UQM fighters RICOCHET off gravity masses — they
+          // never die there, only enemy weapons can kill a fighter
+          if (!dead) {
+            const pd = U.wrapDelta(f.x, f.y, P.x, P.y);
+            if (U.len(pd.x, pd.y) < P.r + 3) {
+              const n = U.norm(pd.x, pd.y);
+              f.x = U.wrapX(P.x + n.x * (P.r + 4));
+              f.y = U.wrapY(P.y + n.y * (P.r + 4));
+              const vn = f.vx * n.x + f.vy * n.y;
+              if (vn < 0) { f.vx -= 1.8 * vn * n.x; f.vy -= 1.8 * vn * n.y; }
+              f.ang = U.ang(f.vx, f.vy);
+              GM.FX.emit(f.x, f.y, 4, { spd: 35, life: 0.3, col: '#c9b48a', size: 1.5 });
+            }
+            const md = U.wrapDelta(f.x, f.y, mp.x, mp.y);
+            if (U.len(md.x, md.y) < M.r + 3) {
+              const n = U.norm(md.x, md.y);
+              f.x = U.wrapX(mp.x + n.x * (M.r + 4));
+              f.y = U.wrapY(mp.y + n.y * (M.r + 4));
+              const vn = f.vx * n.x + f.vy * n.y;
+              if (vn < 0) { f.vx -= 1.8 * vn * n.x; f.vy -= 1.8 * vn * n.y; }
+              f.ang = U.ang(f.vx, f.vy);
+            }
+          }
+        }
+        if (dead) {
+          if (f.life <= 0 && !f.beamT) {
+            GM.FX.emit(f.x, f.y, 6, { spd: 50, life: 0.4, col: '#8fa2c0', size: 1.5 });
+          }
+          this.fighters.splice(i, 1);
+        }
+      }
+
       GM.FX.update(dt);
 
       // victory check
@@ -333,6 +503,7 @@
       if (justWon) {
         this.shots.length = 0;
         this.missiles.length = 0;
+        this.fighters.length = 0;
         for (const s of this.ships) s.mines.length = 0;
         GM.FX.shake = 0;
         GM.FX.flash = 0;

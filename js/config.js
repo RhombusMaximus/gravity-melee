@@ -1,6 +1,6 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.6.0';
+  GM.VERSION = '0.7.0';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
@@ -40,6 +40,7 @@
   GM.CHARS = {
     W: '#f4f8ff', H: '#a9b3c6', h: '#5f6b83', G: '#8ef2ff',
     E: '#ffab3d', e: '#d0641e',
+    K: '#7cff5e',   // Ur-Quan green (Kzer-Za blades/spine)
     P: null, S: null,
   };
 
@@ -136,9 +137,24 @@
     '.....E.E.....',
   ];
 
+  ART.kzerza = [
+    '......K......',
+    '......K......',
+    '.....KPK.....',
+    '.....KPK.....',
+    '....KKPKK....',
+    '...HPPKPPH...',
+    '..HPKPPPKPH..',
+    '..HPPPPPPPH..',
+    '.HPPPKPKPPPH.',
+    '.HPP.KKK.PPH.',
+    '..h..PPP..h..',
+    '..e.EEE.E.e..',
+  ];
+
   GM.SHIPS = [
     {
-      key: 'sparrow', name: 'SC-1 Sparrow', role: 'scout',
+      key: 'sparrow', name: 'SC-1 Sparrow', role: 'scout', cost: 14,
       r: 5, mass: 0.7, accel: 170, turn: 3.9, maxSpeed: 135,
       crew: 12, batt: 26, regen: 6, orbit: 62,
       art: ART.sparrow,
@@ -146,7 +162,7 @@
       special: { label: 'Afterburner', type: 'afterburner', cost: 0, cd: 0, drain: 9 },
     },
     {
-      key: 'vanguard', name: 'TK-4 Vanguard', role: 'cruiser',
+      key: 'vanguard', name: 'TK-4 Vanguard', role: 'cruiser', cost: 19,
       r: 6, mass: 1.0, accel: 120, turn: 2.8, maxSpeed: 105,
       crew: 20, batt: 40, regen: 5, orbit: 85,
       art: ART.vanguard,
@@ -154,7 +170,7 @@
       special: { label: 'Aegis Bubble', type: 'shield', cost: 14, cd: 3.5, dur: 1.1 },
     },
     {
-      key: 'colossus', name: 'HR-9 Colossus', role: 'dreadnought',
+      key: 'colossus', name: 'HR-9 Colossus', role: 'dreadnought', cost: 28,
       r: 8.5, mass: 2.2, accel: 75, turn: 1.7, maxSpeed: 78,
       crew: 42, batt: 44, regen: 4, orbit: 105,
       art: ART.colossus,
@@ -162,7 +178,7 @@
       special: { label: 'Grav Pulse', type: 'pulse', cost: 11, cd: 4, rad: 115 },
     },
     {
-      key: 'mantis', name: 'XT-3 Mantis', role: 'skirmisher',
+      key: 'mantis', name: 'XT-3 Mantis', role: 'skirmisher', cost: 21,
       r: 5.5, mass: 0.85, accel: 135, turn: 3.1, maxSpeed: 118,
       crew: 16, batt: 32, regen: 5.5, orbit: 72,
       art: ART.mantis,
@@ -170,7 +186,7 @@
       special: { label: 'Seeker Pod', type: 'missile', cost: 8, cd: 2.2, speed: 145, dmg: 10, life: 4, turn: 2.7, snd: 'missile' },
     },
     {
-      key: 'wisp', name: 'NV-2 Wisp', role: 'artillery',
+      key: 'wisp', name: 'NV-2 Wisp', role: 'artillery', cost: 23,
       r: 6, mass: 0.8, accel: 95, turn: 2.4, maxSpeed: 92,
       crew: 14, batt: 36, regen: 5, orbit: 135,
       art: ART.wisp,
@@ -178,12 +194,27 @@
       special: { label: 'Blink', type: 'blink', cost: 13, cd: 3, range: 230, snd: 'blink' },
     },
     {
-      key: 'bastion', name: 'RX-5 Bastion', role: 'mine layer',
+      key: 'bastion', name: 'RX-5 Bastion', role: 'mine layer', cost: 20,
       r: 6, mass: 1.1, accel: 110, turn: 2.6, maxSpeed: 96,
       crew: 18, batt: 34, regen: 6, orbit: 78,
       art: ART.bastion,
       weapon: { label: 'Point Pellet', kind: 'pellet', cd: 0.17, cost: 0.9, speed: 225, dmg: 3, size: 2, life: 0.75, count: 1, spread: 0.03, tol: 0.2, snd: 'pellet' },
       special: { label: 'Sting Mine', type: 'mine', cost: 6, cd: 1.1, dmg: 12, rad: 28, maxMines: 4, snd: 'mine' },
+    },
+    {
+      // UQ-42 "Kzer-Za" — a faithful Ur-Quan Dreadnought clone. Stats follow the
+      // original binary (uqm.exe): 42 crew, 42 battery, short-range rapid fusion
+      // bolts, and autonomous fighters that ARE crew — launch costs 1 crew each,
+      // docking refunds it, no new volley while any fighter is airborne.
+      key: 'kzerza', name: 'UQ-42 Kzer-Za', role: 'dreadnought', cost: 30,
+      r: 8, mass: 2.4, accel: 80, turn: 1.6, maxSpeed: 80,
+      crew: 42, batt: 42, regen: 4.2, orbit: 55,
+      art: ART.kzerza,
+      weapon: { label: 'Fusion Bolts', kind: 'fusion', cd: 0.13, cost: 3.2, speed: 300, dmg: 4, size: 3, life: 0.5, count: 1, spread: 0.02, tol: 0.16, snd: 'bolt' },
+      special: {
+        label: 'Launch Fighters', type: 'fighters', cost: 8, cd: 0.5,
+        fspeed: 250, flife: 7, laserRange: 110, laserDmg: 2, laserCd: 0.55,
+      },
     },
   ];
 
@@ -204,9 +235,10 @@
   }
 
   GM.MODES = [
-    { key: '1', label: '1 v 1',       teams: [1, 1] },
-    { key: '2', label: '2 v 2',       teams: [2, 2] },
-    { key: '3', label: '3 v 3 v 3',   teams: [3, 3, 3] },
+    // budget: point cap per TEAM (Super Melee style) — every slot must fit.
+    { key: '1', label: '1 v 1',       teams: [1, 1],       budget: 30 },
+    { key: '2', label: '2 v 2',       teams: [2, 2],       budget: 50 },
+    { key: '3', label: '3 v 3 v 3',   teams: [3, 3, 3],    budget: 66 },
   ];
 
   GM.PILOTS = [

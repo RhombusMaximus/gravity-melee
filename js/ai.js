@@ -271,6 +271,13 @@
         case 'mine':
           use = dist < 140 * S && U.chance(0.5);
           break;
+        case 'fighters':
+          // don't fly the crew into the grave: launch only with a healthy
+          // crew pool — offensively when an enemy ship is in flight-deck
+          // range, defensively when taking fire from anything (fighters,
+          // missiles, shots) while the mothership keeps its distance
+          use = crewFrac > 0.35 && (dist < 260 * S || s.hitT > 0.02);
+          break;
         case 'blink':
           use = (b.mode === 'slingshot' && U.chance(0.6)) ||
                 (crewFrac < 0.4 && dist > 110 * S && U.chance(0.5));

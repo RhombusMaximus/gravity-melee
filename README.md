@@ -20,11 +20,16 @@ and the game window fills 80% of your browser width. HUD is a separate
 
 ## Modes
 
-| Key | Mode |
-|-----|------|
-| 1 | 1 v 1 |
-| 2 | 2 v 2 |
-| 3 | 3 v 3 v 3 |
+| Key | Mode | Team budget |
+|-----|------|-------------|
+| 1 | 1 v 1 | 30 pts |
+| 2 | 2 v 2 | 50 pts |
+| 3 | 3 v 3 v 3 | 66 pts |
+
+Every ship has a **point cost**. After picking a mode you assemble your AZURE
+squadron on the **fleet assembly** screen — cycle ships per slot (`A`/`D`),
+move between slots (`W`/`S`), randomize (`R`), and deploy (`ENTER`). Enemy
+teams auto-fill under the same budget, so nobody fields an unfair fleet.
 
 ## Controls
 
@@ -64,7 +69,6 @@ squadron from the moment the match starts, no lock-in press needed.
 
 - **Online multiplayer** — next phase (WebRTC peer-to-peer or lightweight
   relay; the sim is already deterministic-ish per fixed-step)
-- Ship-select screen & team building
 - Persistent pilot records (kills per archetype)
 
 ## HUD
@@ -105,14 +109,30 @@ the planet or take the fight to them.
 
 ## Ships
 
-| Ship | Role | Weapon | Special |
-|------|------|--------|---------|
-| SC-1 Sparrow | scout | rapid pulse darts | afterburner |
-| TK-4 Vanguard | cruiser | auto bolt | aegis bubble (brief invulnerability) |
-| HR-9 Colossus | dreadnought | siege plasma (AoE) | grav pulse (radial shove) |
-| XT-3 Mantis | skirmisher | 3-shot fragment volley | homing seeker pod |
-| NV-2 Wisp | artillery | slow heavy lob | blink teleport |
-| RX-5 Bastion | mine layer | point-defense pellet | sting mines |
+| Ship | Cost | Role | Weapon | Special |
+|------|------|------|--------|---------|
+| SC-1 Sparrow | 14 | scout | rapid pulse darts | afterburner |
+| TK-4 Vanguard | 19 | cruiser | auto bolt | aegis bubble (brief invulnerability) |
+| HR-9 Colossus | 28 | dreadnought | siege plasma (AoE) | grav pulse (radial shove) |
+| XT-3 Mantis | 21 | skirmisher | 3-shot fragment volley | homing seeker pod |
+| NV-2 Wisp | 23 | artillery | slow heavy lob | blink teleport |
+| RX-5 Bastion | 20 | mine layer | point-defense pellet | sting mines |
+| UQ-42 Kzer-Za | 30 | dreadnought | fusion bolts (rapid, short range) | launch fighters |
+
+### UQ-42 Kzer-Za — the Dreadnought clone
+
+A faithful homage to the Ur-Quan Dreadnought, tuned to the original binary's
+numbers (42 crew, 42 battery):
+
+- **Fusion bolts** — rapid, short-range green plasma; your bolts pass through
+  your own fighters.
+- **Launch Fighters** — each fighter *is a crew member*: launching costs
+  1 crew per fighter (two per volley while you have crew to spare) plus 8
+  battery. Fighters chase, laser enemies in range, turn for home late in
+  their flight, and **dock to refund the crew**. No new volley launches
+  while any fighter is airborne.
+- Fighters **ricochet off planets and moons** — only enemy weapons kill
+  them. Every fighter lost is a permanent crew wound; every docking is a heal.
 
 ## Tech
 

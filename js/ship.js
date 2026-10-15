@@ -150,6 +150,12 @@
     useSpecial(world) {
       if (this.scd > 0 || this.dead) return;
       const sp = this.spec.special;
+      // UQM launch queue: a Dreadnought cannot launch while any fighter is
+      // airborne, and needs crew to spare. A blocked launch burns nothing.
+      if (sp.type === 'fighters') {
+        const airborne = world.fighters.filter((f) => f.by === this).length;
+        if (airborne > 0 || this.crew <= 1) { this.scd = 0.25; return; }
+      }
       if (this.batt < sp.cost) return;
       this.batt -= sp.cost;
       this.scd = sp.cd;
@@ -196,6 +202,28 @@
             t: 0, armed: false, explode: false,
           });
           GM.A.SND.mine();
+          break;
+        }
+        case 'fighters': {
+          // Launch 2 if crew > 2, else 1 (UQM: i = crew_level > 2 ? 2 : 1).
+          // Each fighter IS a crew member: -1 crew per launch, refunded on dock.
+          // They eject from the REAR bay in a ±40° fan (UQM: facing+180°, ±2).
+          const n = this.crew > 2 ? 2 : 1;
+          for (let i = 0; i < n; i++) {
+            this.crew--;
+            const back = this.ang + Math.PI + (i === 0 ? 0.7 : -0.7);
+            world.fighters.push({
+              x: U.wrapX(this.x + Math.cos(back) * (this.r + 6)),
+              y: U.wrapY(this.y + Math.sin(back) * (this.r + 6)),
+              vx: this.vx * 0.4 + Math.cos(back) * sp.fspeed * 0.45,
+              vy: this.vy * 0.4 + Math.sin(back) * sp.fspeed * 0.45,
+              ang: back, team: this.team, by: this,
+              life: sp.flife, laserCd: 0.4 + i * 0.25, retgtT: 0,
+              tgt: null, beamT: 0, dead: false,
+            });
+          }
+          GM.A.SND.missile();
+          GM.FX.emit(this.x, this.y, 10, { spd: 90, life: 0.4, col: GM.TEAMS[this.team].glow, size: 2 });
           break;
         }
       }
