@@ -24,6 +24,17 @@
   window.addEventListener('keydown', (e) => {
     if (['Tab', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
     GM.A.ensure(); GM.A.resume();
+
+    // render + play music on the first user interaction (any key — this
+    // must come before any early-return key handling so the title theme
+    // starts regardless of which key wakes the page)
+    if (!GM._musicInit) {
+      GM._musicInit = true;
+      GM.A.renderMusic().then(function () {
+        if (GM.state === 'title') GM.A.startMusic('hyper');
+      });
+    }
+
     if (keys[e.code]) return;      // ignore autorepeat
     keys[e.code] = true;
 
@@ -410,11 +421,5 @@
   GM.FX.init();
   GM.R.init();
   if (GM.A.loadContent) GM.A.loadContent();
-  // hyperspace theme on the title screen (starts after first keypress due
-  // to browser autoplay policy; renderMusic is async)
-  document.addEventListener('keydown', function once() {
-    GM.A.renderMusic().then(function () { if (GM.state === 'title') GM.A.startMusic('hyper'); });
-    document.removeEventListener('keydown', once);
-  });
   requestAnimationFrame(frame);
 })(window.GM);
