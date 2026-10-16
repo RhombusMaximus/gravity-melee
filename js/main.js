@@ -68,7 +68,7 @@
 
     if (GM.state === 'victory') {
       if (c === 'KeyR') startGame(GM.world.mode);
-      else if (c === 'Escape') { GM.state = 'title'; }
+      else if (c === 'Escape') { GM.state = 'title'; GM.A.startMusic('hyper'); }
       return;
     }
 
@@ -78,7 +78,7 @@
       else if (c === 'KeyX') releaseShip();
       else if (c === 'Tab') cycleTarget();
       else if (c === 'KeyC') orderFocusFire();
-      else if (c === 'Escape') { GM.state = 'title'; GM.world = null; GM.humanShip = null; GM.humanTarget = null; GM.playerTeam = null; GM.A.stopMusic(); }
+      else if (c === 'Escape') { GM.state = 'title'; GM.world = null; GM.humanShip = null; GM.humanTarget = null; GM.playerTeam = null; GM.A.startMusic('hyper'); }
     }
   });
 
@@ -245,7 +245,7 @@
     GM.playerTeam = 0;         // P1 = first ship of first team; camera anchors here
     GM.FX.init();
     GM.R.init();
-    GM.A.renderMusic().then(function () { GM.A.startMusic(); });
+    GM.A.renderMusic().then(function () { GM.A.startMusic('battle'); });
     GM.A.SND.ui();
   }
 
@@ -410,5 +410,11 @@
   GM.FX.init();
   GM.R.init();
   if (GM.A.loadContent) GM.A.loadContent();
+  // hyperspace theme on the title screen (starts after first keypress due
+  // to browser autoplay policy; renderMusic is async)
+  document.addEventListener('keydown', function once() {
+    GM.A.renderMusic().then(function () { if (GM.state === 'title') GM.A.startMusic('hyper'); });
+    document.removeEventListener('keydown', once);
+  });
   requestAnimationFrame(frame);
 })(window.GM);

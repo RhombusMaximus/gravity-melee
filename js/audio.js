@@ -10,6 +10,11 @@
     A.master = A.ctx.createGain();
     A.master.gain.value = A.vol;
     A.master.connect(A.ctx.destination);
+    // dedicated SFX bus: effects route through this, music rides its own
+    // gain node — so the melee theme can be loud while booms stay tame
+    A.sfx = A.ctx.createGain();
+    A.sfx.gain.value = A.sfxLevel;
+    A.sfx.connect(A.master);
     return A.ctx;
   };
   A.resume = () => { if (A.ctx && A.ctx.state === 'suspended') A.ctx.resume(); };
@@ -21,6 +26,7 @@
     return A.muted;
   };
   A.vol = 0.22;
+  A.sfxLevel = 0.4;   // SFX bus gain (lower than the music's 0.7)
   A.volStep = 0.04;
   A.volUp = () => { A.vol = Math.min(0.6, +(A.vol + A.volStep).toFixed(2)); if (!A.muted && A.master) A.master.gain.value = A.vol; return A.vol; };
   A.volDown = () => { A.vol = Math.max(0, +(A.vol - A.volStep).toFixed(2)); if (!A.muted && A.master) A.master.gain.value = A.vol; return A.vol; };
@@ -35,7 +41,7 @@
     if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, freq * slide), t0 + dur);
     g.gain.setValueAtTime(vol, t0);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    o.connect(g); g.connect(A.master);
+    o.connect(g); g.connect(A.sfx || A.master);
     o.start(t0); o.stop(t0 + dur + 0.02);
   }
 
@@ -53,7 +59,7 @@
     const g = A.ctx.createGain();
     g.gain.setValueAtTime(vol, t0);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    n.connect(f); f.connect(g); g.connect(A.master);
+    n.connect(f); f.connect(g); g.connect(A.sfx || A.master);
     n.start(t0); n.stop(t0 + dur);
   }
 
@@ -83,52 +89,60 @@
     src.playbackRate.value = rate;
     const g = A.ctx.createGain();
     g.gain.value = vol;
-    src.connect(g); g.connect(A.master);
+    src.connect(g); g.connect(A.sfx || A.master);
     src.start();
     return true;
   };
 
-  // ---- Star Control II melee music (battle.mod via ProTracker, CC BY-NC-SA 2.5) ----
-  // Rendered once at boot (after first user gesture, so the AudioContext can
-  // decode), then looped as a BufferSource during matches.
+  // ---- Star Control II music (battle.mod + hyper.mod via ProTracker) ----
+  // Two tracks: "battle" (the melee theme) plays during matches, "hyper"
+  // (the hyperspace ambient theme) plays on the title screen. Both are
+  // rendered once at first user gesture, then looped as BufferSources.
   A.musicReady = false;
   A.musicSrc = null;
+  A.musicTrack = null;
   A.musicGainVal = 0.7;
 
   A.renderMusic = async () => {
-    if (A.musicReady || !window.ProTracker || !GM.CONTENT || !GM.CONTENT.mods || !GM.CONTENT.mods.battle) return;
+    if (A.musicReady || !window.ProTracker || !GM.CONTENT || !GM.CONTENT.mods) return;
     const ctx = A.ensure();
     if (!ctx) return;
-    try {
-      const uri = GM.CONTENT.mods.battle;
-      const raw = atob(uri.split(',')[1]);
-      const bytes = new Uint8Array(raw.length);
-      for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
-      const mod = ProTracker.parse(bytes);
-      const { pcm, sampleRate } = ProTracker.render(mod, { sampleRate: 44100, loops: 1 });
-      const buf = ctx.createBuffer(1, pcm.length, sampleRate);
-      buf.copyToChannel(pcm, 0);
-      A.musicBuffer = buf;
-      A.musicReady = true;
-    } catch (e) { /* no music: the game plays on, silent */ }
+    A.musicBuffers = {};
+    for (const name of Object.keys(GM.CONTENT.mods)) {
+      try {
+        const raw = atob(GM.CONTENT.mods[name].split(',')[1]);
+        const bytes = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+        const mod = ProTracker.parse(bytes);
+        const { pcm, sampleRate } = ProTracker.render(mod, { sampleRate: 44100, loops: 1 });
+        const buf = ctx.createBuffer(1, pcm.length, sampleRate);
+        buf.copyToChannel(pcm, 0);
+        A.musicBuffers[name] = buf;
+      } catch (e) { /* skip this track */ }
+    }
+    A.musicReady = Object.keys(A.musicBuffers).length > 0;
   };
 
-  A.startMusic = () => {
-    if (!A.musicReady || A.musicSrc) return;
+  A.startMusic = (track) => {
+    if (!A.musicReady) return;
+    if (A.musicSrc && A.musicTrack === track) return;   // already playing this
+    A.stopMusic();
+    const buf = A.musicBuffers[track] || A.musicBuffers.battle;
+    if (!buf) return;
     const ctx = A.ensure();
     if (!ctx) return;
     if (ctx.state === 'suspended') ctx.resume();
-    A.stopMusic();
     const src = ctx.createBufferSource();
-    src.buffer = A.musicBuffer;
-    src.loop = true;   // battle.mod loops seamlessly (its order wraps to restart)
+    src.buffer = buf;
+    src.loop = true;
     const g = ctx.createGain();
     g.gain.value = A.muted ? 0 : A.musicGainVal;
     src.connect(g);
-    g.connect(A.master);
+    g.connect(A.master);   // music rides its own gain → master, NOT the sfx bus
     src.start();
     A.musicSrc = src;
     A.musicGain = g;
+    A.musicTrack = track;
   };
 
   A.stopMusic = () => {
