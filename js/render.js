@@ -14,12 +14,19 @@
   };
 
   // ---- Star Control II planet discs (js/content.js, CC BY-NC-SA 2.5) ----
-  // Each match picks a random SC2 world. Gas giants, magma, the Rainbow
-  // Worlds and radioactive worlds get palette-cycled "flowing" frames, the
-  // classic color-table animation trick from the original game.
+  // Each match picks a random SC2 world for the planet AND a different one
+  // for the moon. Gas giants, magma, the Rainbow Worlds and radioactive
+  // worlds get palette-cycled "flowing" frames, the classic SC2
+  // color-table animation trick.
+  R.moonImg = null;
+  R.moonFrames = null;
+  R.moonKey = null;
+
   R.pickPlanet = () => {
     R.planetImg = null;
     R.planetFrames = null;
+    R.moonImg = null;
+    R.moonFrames = null;
     const C = GM.CONTENT;
     const keys = C && C.planets ? Object.keys(C.planets) : [];
     if (!keys.length) return;
@@ -35,11 +42,25 @@
       if (C.cycle.includes(key)) R.bakeCycle(cv);
     };
     img.src = C.planets[key];
+
+    // moon: a DIFFERENT planet type, so the pair looks intentional
+    const moonKeys = keys.filter((k) => k !== key);
+    const mkey = moonKeys.length ? U.pick(moonKeys) : key;
+    R.moonKey = mkey;
+    const mimg = new Image();
+    mimg.onload = () => {
+      if (R.moonKey !== mkey) return;
+      const cv = document.createElement('canvas');
+      cv.width = mimg.width; cv.height = mimg.height;
+      cv.getContext('2d').drawImage(mimg, 0, 0);
+      R.moonImg = cv;
+      if (C.cycle.includes(mkey)) R.moonFrames = R.bakeCycleFrames(cv);
+    };
+    mimg.src = C.planets[mkey];
   };
 
-  // pre-bake N palette-rotation frames: every pixel's color advances along
-  // the luminance-sorted palette ramp, one step per frame
-  R.bakeCycle = (src) => {
+  // bake N palette-rotation frames from a disc canvas; returns the frame list
+  R.bakeCycleFrames = (src) => {
     const w = src.width, h = src.height;
     const d = src.getContext('2d').getImageData(0, 0, w, h).data;
     const seen = new Map();
@@ -47,12 +68,12 @@
       if (d[i + 3] < 16) continue;
       seen.set((d[i] << 16) | (d[i + 1] << 8) | d[i + 2], 0);
     }
-    if (seen.size < 2) return;
+    if (seen.size < 2) return null;
     const lum = (c) => ((c >> 16) & 255) * 0.3 + ((c >> 8) & 255) * 0.6 + (c & 255) * 0.1;
     const ramp = [...seen.keys()].sort((a, b) => lum(a) - lum(b));
     const idx = new Map(ramp.map((c, i) => [c, i]));
     const N = 12;
-    R.planetFrames = [];
+    const frames = [];
     for (let f = 0; f < N; f++) {
       const fd = new Uint8ClampedArray(d.length);
       for (let i = 0; i < d.length; i += 4) {
@@ -63,8 +84,15 @@
       const fcv = document.createElement('canvas');
       fcv.width = w; fcv.height = h;
       fcv.getContext('2d').putImageData(new ImageData(fd, w, h), 0, 0);
-      R.planetFrames.push(fcv);
+      frames.push(fcv);
     }
+    return frames;
+  };
+
+  // pre-bake N palette-rotation frames: every pixel's color advances along
+  // the luminance-sorted palette ramp, one step per frame
+  R.bakeCycle = (src) => {
+    R.planetFrames = R.bakeCycleFrames(src);
   };
 
   // the planet canvas to draw this frame: cycled frame, plain SC2 disc, or
@@ -168,10 +196,21 @@
       g.globalAlpha = 1;
     }
 
-    // moon
+    // moon: SC2 disc (palette-cycled for cycle types), baked fallback
     const em = U.eff(mp.x, mp.y);
-    const md = Math.max(2, Math.round(M.r * 2 * zs));
-    g.drawImage(R.moonCv, (em.x - md / 2) | 0, (em.y - md / 2) | 0, md, md);
+    let mcv = R.moonImg;
+    if (mcv && R.moonFrames && R.moonFrames.length) {
+      mcv = R.moonFrames[Math.floor((t || 0) * 9) % R.moonFrames.length];
+    }
+    if (mcv) {
+      const mh = Math.max(2, Math.round(M.r * 2 * zs));
+      const mw = Math.max(2, Math.round(mh * mcv.width / mcv.height));
+      const man = (GM.CONTENT.anchors && GM.CONTENT.anchors[R.moonKey]) || [mcv.width / 2, mcv.height / 2];
+      g.drawImage(mcv, (em.x - mw * man[0] / mcv.width) | 0, (em.y - mh * man[1] / mcv.height) | 0, mw, mh);
+    } else {
+      const md = Math.max(2, Math.round(M.r * 2 * zs));
+      g.drawImage(R.moonCv, (em.x - md / 2) | 0, (em.y - md / 2) | 0, md, md);
+    }
 
     // mines
     for (const s of world.ships) {

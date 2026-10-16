@@ -47,7 +47,7 @@ teams auto-fill under the same budget, so nobody fields an unfair fleet.
 | G | show AI minds (targets, modes, line-of-sight) |
 | P | pause |
 | M | mute |
-| N | music on/off |
+| N | music on/off (x2 louder) |
 | [ / ] | volume down / up |
 | - / = | simulation speed ×0.25 … ×4 |
 
@@ -94,6 +94,7 @@ the planet or take the fight to them.
 
 ## The gravity well
 
+- Ship-to-ship collision: elastic mass-weighted bounce with closing-speed damage — heavy hulls hurt light scouts
 - Inverse-square gravity from the planet, plus a moon on a circular orbit —
   shots curve too, so slinging a plasma bolt around the planet is a real tactic.
 - The arena wraps (torus), so the shortest path to your enemy may be off-screen

@@ -93,7 +93,7 @@
   // decode), then looped as a BufferSource during matches.
   A.musicReady = false;
   A.musicSrc = null;
-  A.musicGainVal = 0.35;
+  A.musicGainVal = 0.7;
 
   A.renderMusic = async () => {
     if (A.musicReady || !window.ProTracker || !GM.CONTENT || !GM.CONTENT.mods || !GM.CONTENT.mods.battle) return;

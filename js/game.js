@@ -488,6 +488,55 @@
         }
       }
 
+      // ship-to-ship collision: elastic bounce + closing-speed damage
+      // (mass-weighted momentum exchange; spawn-protected ships bounce but
+      // take no damage; both sides get a short crash cooldown)
+      for (let i = 0; i < this.ships.length; i++) {
+        const a = this.ships[i];
+        if (a.dead) continue;
+        for (let j = i + 1; j < this.ships.length; j++) {
+          const b = this.ships[j];
+          if (b.dead) continue;
+          const w = U.wrapDelta(a.x, a.y, b.x, b.y);
+          const dist = U.len(w.x, w.y);
+          const overlap = a.r + b.r - dist;
+          if (overlap <= 0) continue;
+
+          // separate along the collision normal
+          const n = U.norm(w.x, w.y);
+          const ma = a.spec.mass || 1, mb = b.spec.mass || 1;
+          const tm = ma + mb;
+          const sepA = overlap * (mb / tm), sepB = overlap * (ma / tm);
+          a.x = U.wrapX(a.x - n.x * sepA); a.y = U.wrapY(a.y - n.y * sepA);
+          b.x = U.wrapX(b.x + n.x * sepB); b.y = U.wrapY(b.y + n.y * sepB);
+
+          // elastic momentum exchange along the normal
+          const rvx = b.vx - a.vx, rvy = b.vy - a.vy;
+          const vn = rvx * n.x + rvy * n.y;
+          if (vn < 0) {
+            const imp = -vn * 2 / tm;
+            a.vx -= n.x * imp * mb; a.vy -= n.y * imp * mb;
+            b.vx += n.x * imp * ma; b.vy += n.y * imp * ma;
+          }
+
+          // damage by closing speed (once per pair per 0.5s)
+          const spd = Math.abs(vn);
+          const ct = Math.max(a.crashT || 0, b.crashT || 0);
+          if (spd > 40 && ct <= 0) {
+            const dmg = (spd - 40) * 0.08;
+            if (dmg > 0.5) {
+              GM.A.SND.crunch();
+              GM.FX.addShake(Math.min(6, dmg * 0.5));
+              GM.FX.emit((a.x + b.x) / 2, (a.y + b.y) / 2, 12,
+                { spd: 70, life: 0.5, col: '#ff9a6a', size: 2 });
+              if (a.spawnProt <= 0) a.damage(dmg, b, this, 'crash');
+              if (b.spawnProt <= 0) b.damage(dmg, a, this, 'crash');
+              a.crashT = 0.5; b.crashT = 0.5;
+            }
+          }
+        }
+      }
+
       GM.FX.update(dt);
 
       // victory check
