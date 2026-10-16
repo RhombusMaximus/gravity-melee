@@ -59,7 +59,10 @@
     mimg.src = C.planets[mkey];
   };
 
-  // bake N palette-rotation frames from a disc canvas; returns the frame list
+  // bake N palette-rotation frames from a disc canvas; returns the frame list.
+  // Uses a ping-pong shift (advance, reverse) with clamping at the ramp ends
+  // so bright pixels never wrap to the dark end — that produced a black
+  // blob on the sunlit face of cycle planets.
   R.bakeCycleFrames = (src) => {
     const w = src.width, h = src.height;
     const d = src.getContext('2d').getImageData(0, 0, w, h).data;
@@ -73,13 +76,18 @@
     const ramp = [...seen.keys()].sort((a, b) => lum(a) - lum(b));
     const idx = new Map(ramp.map((c, i) => [c, i]));
     const N = 12;
+    const half = Math.ceil(N / 2);
     const frames = [];
     for (let f = 0; f < N; f++) {
+      // ping-pong: 0,1,2,...,5,5,4,...,1,0 — smooth both directions
+      const shift = f < half ? f : Math.max(0, (N - 1 - f) % half);
       const fd = new Uint8ClampedArray(d.length);
       for (let i = 0; i < d.length; i += 4) {
-        if (d[i + 3] < 16) continue;
-        const k = ramp[(idx.get((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]) + f) % ramp.length];
-        fd[i] = k >> 16; fd[i + 1] = (k >> 8) & 255; fd[i + 2] = k & 255; fd[i + 3] = 255;
+        const a = d[i + 3];
+        if (a < 16) continue;
+        const j = Math.min(idx.get((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]) + shift, ramp.length - 1);
+        const k = ramp[j];
+        fd[i] = k >> 16; fd[i + 1] = (k >> 8) & 255; fd[i + 2] = k & 255; fd[i + 3] = a;
       }
       const fcv = document.createElement('canvas');
       fcv.width = w; fcv.height = h;
