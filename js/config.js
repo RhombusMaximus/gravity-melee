@@ -1,6 +1,6 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.9.0';
+  GM.VERSION = '0.9.1';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
@@ -254,7 +254,7 @@
       // sprite + stats from slylandr.c: 12 crew, 20 battery, NO regen
       // (charges by docking), lightning + directional dash.
       key: 'probe', name: 'SL-12 Probe', role: 'interceptor', cost: 18,
-      r: 5, mass: 0.6, accel: 240, turn: 4.5, maxSpeed: 160,
+      r: 5, mass: 0.6, accel: 180, turn: 3.2, maxSpeed: 135,
       crew: 12, batt: 20, regen: 0, orbit: 90,
       sprite: 'SHIP:slylandro',
       weapon: { label: 'Lightning', kind: 'bolt', cd: 0.35, cost: 2, speed: 300, dmg: 6, size: 3, life: 0.6, count: 1, spread: 0, tol: 0.14, snd: 'bolt' },

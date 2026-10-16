@@ -519,6 +519,18 @@
             b.vx += n.x * imp * ma; b.vy += n.y * imp * ma;
           }
 
+          // guarantee minimum separation velocity so ships don't
+          // re-collide every frame in the gravity well (the "wild spin"
+          // bug: elastic bounce was too weak to overcome gravity for
+          // heavy hulls, creating a 60Hz oscillation + constant shake)
+          const vnAfter = (b.vx - a.vx) * n.x + (b.vy - a.vy) * n.y;
+          const MIN_SEP = 60;   // world units/s — enough to escape the well
+          if (vnAfter < MIN_SEP) {
+            const boost = (MIN_SEP - vnAfter) / 2;
+            a.vx -= n.x * boost; a.vy -= n.y * boost;
+            b.vx += n.x * boost; b.vy += n.y * boost;
+          }
+
           // damage by closing speed (once per pair per 0.5s)
           const spd = Math.abs(vn);
           const ct = Math.max(a.crashT || 0, b.crashT || 0);
@@ -526,7 +538,7 @@
             const dmg = (spd - 40) * 0.08;
             if (dmg > 0.5) {
               GM.A.SND.crunch();
-              GM.FX.addShake(Math.min(6, dmg * 0.5));
+              GM.FX.addShake(Math.min(3, dmg * 0.3));   // gentle: 6 was too much at 60Hz
               GM.FX.emit((a.x + b.x) / 2, (a.y + b.y) / 2, 12,
                 { spd: 70, life: 0.5, col: '#ff9a6a', size: 2 });
               if (a.spawnProt <= 0) a.damage(dmg, b, this, 'crash');

@@ -567,8 +567,29 @@
     g.fillRect(0, 0, GM.VW, GM.VH);
   };
 
-  // standalone pixel-sprite renderer (select screen; art chars, nose up)
+  // standalone ship preview renderer for the select screen;
+  // handles both string-map art and SC2 sprite images
   function drawSprite(g, spec, x, y, px, team) {
+    if (spec.sprite) {
+      // SC2 sprite: draw the image (if loaded), or a placeholder box
+      const img = new Image();
+      img.src = spec.sprite;
+      if (img.complete && img.naturalWidth > 0) {
+        const sw = img.naturalWidth * px;
+        const sh = img.naturalHeight * px;
+        g.imageSmoothingEnabled = false;
+        g.drawImage(img, Math.round(x - sw / 2), Math.round(y - sh / 2), sw, sh);
+      } else {
+        img.onload = () => { /* next frame will pick it up */ };
+        g.strokeStyle = '#2a3450';
+        g.strokeRect(x - 15, y - 12, 30, 24);
+        g.fillStyle = '#55688a';
+        g.font = '7px monospace';
+        g.textAlign = 'center';
+        g.fillText('...', x, y);
+      }
+      return;
+    }
     const art = spec.art;
     const w = art[0].length, h = art.length;
     const T = team !== null && team !== undefined ? GM.TEAMS[team] : { P: '#3fc8ff', S: '#155a9e' };
