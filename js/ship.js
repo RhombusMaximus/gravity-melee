@@ -2,6 +2,16 @@
 (function (GM) {
   const { U } = GM;
 
+  // pre-loaded SC2 ship sprite images (data URIs from content.js)
+  const SPRITE_CACHE = {};
+  function getSprite(uri) {
+    if (SPRITE_CACHE[uri]) return SPRITE_CACHE[uri];
+    const img = new Image();
+    img.src = uri;
+    SPRITE_CACHE[uri] = img;
+    return img;
+  }
+
   class Ship {
     constructor(spec, team, name, aiProfile) {
       this.spec = spec;
@@ -298,8 +308,6 @@
     draw(g, t) {
       if (this.dead) return;
       const T = GM.TEAMS[this.team];
-      const art = this.spec.art;
-      const w = art[0].length, h = art.length;
       const e = U.eff(this.x, this.y);        // camera-space position
       const PS = Math.max(2, Math.round(3 * GM.zoomCur));   // pixel scale, zoom-aware
       if (e.x < -40 || e.x > GM.WV + 40 || e.y < -40 || e.y > GM.WH + 40) return;   // culled
@@ -312,6 +320,47 @@
         g.stroke();
         g.globalAlpha = 1;
       }
+
+      // SC2 sprite path: draw the real Star Control II ship art, rotated
+      if (this.spec.sprite) {
+        const img = getSprite(this.spec.sprite);
+        if (img.complete && img.naturalWidth > 0) {
+          g.save();
+          g.translate(e.x, e.y);
+          g.rotate(this.ang + Math.PI / 2);   // sprite faces "north"
+          const sw = img.naturalWidth * PS;
+          const sh = img.naturalHeight * PS;
+          g.imageSmoothingEnabled = false;
+          g.drawImage(img, -sw / 2, -sh / 2, sw, sh);
+          // team-color tint: draw a colored rect with 'source-atop' blend
+          g.globalCompositeOperation = 'source-atop';
+          g.fillStyle = T.P;
+          g.globalAlpha = 0.12;
+          g.fillRect(-sw, -sh, sw * 2, sh * 2);
+          g.globalAlpha = 1;
+          g.globalCompositeOperation = 'source-over';
+          g.restore();
+          if (this.hitT > 0) {
+            g.globalAlpha = 0.5;
+            g.fillStyle = '#fff';
+            g.beginPath();
+            g.arc(e.x, e.y, this.r * GM.zoomCur, 0, U.TAU);
+            g.fill();
+            g.globalAlpha = 1;
+          }
+          if (this.spawnProt > 0) {
+            g.globalAlpha = 0.3 + 0.2 * Math.sin(t * 12);
+            g.strokeStyle = '#fff';
+            const q = 12 * GM.zoomCur;
+            g.strokeRect(e.x - q, e.y - q, q * 2, q * 2);
+            g.globalAlpha = 1;
+          }
+          return;
+        }
+      }
+
+      // string-map pixel art path (original ships)
+      const art = this.spec.art;
 
       g.save();
       g.translate(e.x, e.y);

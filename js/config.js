@@ -1,6 +1,6 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.8.3';
+  GM.VERSION = '0.9.0';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
@@ -216,6 +216,50 @@
         fspeed: 250, flife: 7, laserRange: 110, laserDmg: 2, laserCd: 0.55,
       },
     },
+    {
+      // KH-42 Marauder — the Kohr-Ah's blade-throwing dreadnought. Real SC2
+      // sprite + stats from blackurq.c: 42 crew, 42 battery, F.R.I.E.D.
+      // expanding ring + spinning buzzsaw blades.
+      key: 'marauder', name: 'KH-42 Marauder', role: 'dreadnought', cost: 30,
+      r: 8, mass: 2.4, accel: 80, turn: 1.6, maxSpeed: 80,
+      crew: 42, batt: 42, regen: 4.2, orbit: 60,
+      sprite: 'SHIP:kohrah',
+      weapon: { label: 'F.R.I.E.D.', kind: 'plasma', cd: 1.0, cost: 6, speed: 155, dmg: 10, size: 6, life: 2.0, count: 1, spread: 0, tol: 0.2, aoe: 36, snd: 'plasma' },
+      special: { label: 'Buzzsaw Blades', type: 'mine', cost: 12, cd: 1.5, dmg: 8, rad: 22, maxMines: 6, snd: 'mine' },
+    },
+    {
+      // CH-42 Avatar — the Chmmr's crystalline powerhouse. Real SC2 sprite
+      // + stats from chmmr.c: 42 crew, 42 battery, near-instant regen,
+      // continuous laser, and the point-defense satellite screen.
+      key: 'avatar', name: 'CH-42 Avatar', role: 'heavy cruiser', cost: 28,
+      r: 8, mass: 2.4, accel: 70, turn: 1.8, maxSpeed: 72,
+      crew: 42, batt: 42, regen: 8, orbit: 65,
+      sprite: 'SHIP:chmmr',
+      weapon: { label: 'Auto Laser', kind: 'dart', cd: 0.06, cost: 0.8, speed: 330, dmg: 2, size: 2, life: 0.8, count: 1, spread: 0.02, tol: 0.16, snd: 'laser' },
+      special: { label: 'Satellite Screen', type: 'shield', cost: 6, cd: 2, dur: 1.6 },
+    },
+    {
+      // YE-20 Terminator — the Yehat's agile gunship. Real SC2 sprite +
+      // stats from yehat.c: 20 crew, 10 battery, dual rapid-fire,
+      // and the iconic tactical shield.
+      key: 'terminator', name: 'YE-20 Terminator', role: 'escort', cost: 22,
+      r: 6, mass: 1.0, accel: 150, turn: 3.2, maxSpeed: 120,
+      crew: 20, batt: 10, regen: 5, orbit: 70,
+      sprite: 'SHIP:yehat',
+      weapon: { label: 'Dual Guns', kind: 'pellet', cd: 0.09, cost: 0.5, speed: 280, dmg: 2, size: 2, life: 0.7, count: 2, spread: 0.05, tol: 0.18, snd: 'pellet' },
+      special: { label: 'Tactical Shield', type: 'shield', cost: 3, cd: 1, dur: 2.0 },
+    },
+    {
+      // SL-12 Probe — the Slylandro's self-replicating probe. Real SC2
+      // sprite + stats from slylandr.c: 12 crew, 20 battery, NO regen
+      // (charges by docking), lightning + directional dash.
+      key: 'probe', name: 'SL-12 Probe', role: 'interceptor', cost: 18,
+      r: 5, mass: 0.6, accel: 240, turn: 4.5, maxSpeed: 160,
+      crew: 12, batt: 20, regen: 0, orbit: 90,
+      sprite: 'SHIP:slylandro',
+      weapon: { label: 'Lightning', kind: 'bolt', cd: 0.35, cost: 2, speed: 300, dmg: 6, size: 3, life: 0.6, count: 1, spread: 0, tol: 0.14, snd: 'bolt' },
+      special: { label: 'Vector Dash', type: 'afterburner', cost: 0, cd: 0, drain: 5 },
+    },
   ];
 
   // Normalize specs to world scale: distances/speeds xS, sprites render 2x.
@@ -228,6 +272,10 @@
     sp.weapon.speed *= S;
     sp.weapon.size *= 3;
     if (sp.weapon.aoe) sp.weapon.aoe *= S;
+    // resolve SC2 sprite references to data URIs from content.js
+    if (sp.sprite && sp.sprite.startsWith('SHIP:') && GM.CONTENT && GM.CONTENT.shipsprites) {
+      sp.sprite = GM.CONTENT.shipsprites[sp.sprite.slice(5)] || null;
+    }
     const k = sp.special;
     if (k.speed) k.speed *= S;
     if (k.range) k.range *= S;

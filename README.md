@@ -120,6 +120,10 @@ the planet or take the fight to them.
 | NV-2 Wisp | 23 | artillery | slow heavy lob | blink teleport |
 | RX-5 Bastion | 20 | mine layer | point-defense pellet | sting mines |
 | UQ-42 Kzer-Za | 30 | dreadnought | fusion bolts (rapid, short range) | launch fighters |
+| KH-42 Marauder | 30 | dreadnought | F.R.I.E.D. (expanding ring) | buzzsaw blades |
+| CH-42 Avatar | 28 | heavy cruiser | auto laser (continuous) | satellite screen |
+| YE-20 Terminator | 22 | escort | dual guns (rapid) | tactical shield |
+| SL-12 Probe | 18 | interceptor | lightning | vector dash |
 
 ### UQ-42 Kzer-Za — the Dreadnought clone
 
