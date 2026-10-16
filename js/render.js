@@ -569,11 +569,17 @@
 
   // standalone ship preview renderer for the select screen;
   // handles both string-map art and SC2 sprite images
+  const PREVIEW_CACHE = {};
   function drawSprite(g, spec, x, y, px, team) {
     if (spec.sprite) {
-      // SC2 sprite: draw the image (if loaded), or a placeholder box
-      const img = new Image();
-      img.src = spec.sprite;
+      // SC2 sprite: use a cached image (creating a new Image from a
+      // 280KB data URI every frame would never finish loading)
+      let img = PREVIEW_CACHE[spec.key];
+      if (!img) {
+        img = new Image();
+        img.src = spec.sprite;
+        PREVIEW_CACHE[spec.key] = img;
+      }
       if (img.complete && img.naturalWidth > 0) {
         const sw = img.naturalWidth * px;
         const sh = img.naturalHeight * px;
