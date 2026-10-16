@@ -31,6 +31,7 @@
 
     // global keys
     if (c === 'KeyM') { GM.A.toggleMute(); return; }
+    if (c === 'KeyN') { GM.A.toggleMusic(); return; }
     if (c === 'BracketLeft' || c === 'BracketRight') {
       if (c === 'BracketLeft') GM.A.volDown();
       else GM.A.volUp();
@@ -77,7 +78,7 @@
       else if (c === 'KeyX') releaseShip();
       else if (c === 'Tab') cycleTarget();
       else if (c === 'KeyC') orderFocusFire();
-      else if (c === 'Escape') { GM.state = 'title'; GM.world = null; GM.humanShip = null; GM.humanTarget = null; GM.playerTeam = null; }
+      else if (c === 'Escape') { GM.state = 'title'; GM.world = null; GM.humanShip = null; GM.humanTarget = null; GM.playerTeam = null; GM.A.stopMusic(); }
     }
   });
 
@@ -244,6 +245,7 @@
     GM.playerTeam = 0;         // P1 = first ship of first team; camera anchors here
     GM.FX.init();
     GM.R.init();
+    GM.A.renderMusic().then(function () { GM.A.startMusic(); });
     GM.A.SND.ui();
   }
 

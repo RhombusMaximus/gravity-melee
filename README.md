@@ -47,6 +47,7 @@ teams auto-fill under the same budget, so nobody fields an unfair fleet.
 | G | show AI minds (targets, modes, line-of-sight) |
 | P | pause |
 | M | mute |
+| N | music on/off |
 | [ / ] | volume down / up |
 | - / = | simulation speed ×0.25 … ×4 |
 
@@ -69,8 +70,6 @@ squadron from the moment the match starts, no lock-in press needed.
 
 - **Online multiplayer** — next phase (WebRTC peer-to-peer or lightweight
   relay; the sim is already deterministic-ish per fixed-step)
-- **SC2 melee music** — the original battle module (`battle.mod`) as the
-  match soundtrack
 - Persistent pilot records (kills per archetype)
 
 ## HUD
@@ -146,12 +145,16 @@ Control II melee sounds (see credits).
 
 ## Content & credits
 
-Every match now plays on a random Star Control II world — the actual
+Every match now fights over a random Star Control II world — the actual
 planet discs from The Ur-Quan Masters (gas giants, magma worlds, the
 Rainbow Worlds…), with palette-cycled flowing animation for the banded
 types, the classic SC2 color-table trick. Damage plays the original
 tiered melee booms (`boom1/23/45/67`, bigger hits = deeper boom), ship
 deaths play `shipdies`, and fighter docking plays the crew-transfer sound.
+And the match soundtrack is the real deal: **the original SC2 melee theme
+("Attack!" by Dan Nicholson, `battle.mod`) plays on loop**, rendered by
+our own [miniprotracker](https://github.com/RhombusMaximus/miniprotracker)
+ProTracker player. `N` toggles music, `M` mutes everything.
 
 **Planet graphics and melee sound effects are Star Control II content,
 © Toys for Bob, distributed via The Ur-Quan Masters, licensed

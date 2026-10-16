@@ -13,7 +13,13 @@
     return A.ctx;
   };
   A.resume = () => { if (A.ctx && A.ctx.state === 'suspended') A.ctx.resume(); };
-  A.toggleMute = () => { A.muted = !A.muted; if (A.master) A.master.gain.value = A.muted ? 0 : A.vol; return A.muted; };
+  A.toggleMute = () => {
+    A.muted = !A.muted;
+    if (A.master) A.master.gain.value = A.muted ? 0 : A.vol;
+    // the music rides its own gain node (not the master), so mute it too
+    if (A.musicGain) A.musicGain.gain.value = A.muted ? 0 : A.musicGainVal;
+    return A.muted;
+  };
   A.vol = 0.22;
   A.volStep = 0.04;
   A.volUp = () => { A.vol = Math.min(0.6, +(A.vol + A.volStep).toFixed(2)); if (!A.muted && A.master) A.master.gain.value = A.vol; return A.vol; };
@@ -80,6 +86,66 @@
     src.connect(g); g.connect(A.master);
     src.start();
     return true;
+  };
+
+  // ---- Star Control II melee music (battle.mod via ProTracker, CC BY-NC-SA 2.5) ----
+  // Rendered once at boot (after first user gesture, so the AudioContext can
+  // decode), then looped as a BufferSource during matches.
+  A.musicReady = false;
+  A.musicSrc = null;
+  A.musicGainVal = 0.35;
+
+  A.renderMusic = async () => {
+    if (A.musicReady || !window.ProTracker || !GM.CONTENT || !GM.CONTENT.mods || !GM.CONTENT.mods.battle) return;
+    const ctx = A.ensure();
+    if (!ctx) return;
+    try {
+      const uri = GM.CONTENT.mods.battle;
+      const raw = atob(uri.split(',')[1]);
+      const bytes = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+      const mod = ProTracker.parse(bytes);
+      const { pcm, sampleRate } = ProTracker.render(mod, { sampleRate: 44100, loops: 1 });
+      const buf = ctx.createBuffer(1, pcm.length, sampleRate);
+      buf.copyToChannel(pcm, 0);
+      A.musicBuffer = buf;
+      A.musicReady = true;
+    } catch (e) { /* no music: the game plays on, silent */ }
+  };
+
+  A.startMusic = () => {
+    if (!A.musicReady || A.musicSrc) return;
+    const ctx = A.ensure();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    A.stopMusic();
+    const src = ctx.createBufferSource();
+    src.buffer = A.musicBuffer;
+    src.loop = true;   // battle.mod loops seamlessly (its order wraps to restart)
+    const g = ctx.createGain();
+    g.gain.value = A.muted ? 0 : A.musicGainVal;
+    src.connect(g);
+    g.connect(A.master);
+    src.start();
+    A.musicSrc = src;
+    A.musicGain = g;
+  };
+
+  A.stopMusic = () => {
+    if (A.musicSrc) {
+      try { A.musicSrc.stop(); } catch (e) {}
+      A.musicSrc = null;
+    }
+  };
+
+  // toggle music on/off (N key); returns the new state
+  A.musicOn = true;
+  A.toggleMusic = () => {
+    A.musicOn = !A.musicOn;
+    if (A.musicOn) A.startMusic();
+    else A.stopMusic();
+    GM.A.SND.ui();
+    return A.musicOn;
   };
 
   A.SND = {
