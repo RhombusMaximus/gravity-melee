@@ -407,5 +407,6 @@
   // boot
   GM.FX.init();
   GM.R.init();
+  if (GM.A.loadContent) GM.A.loadContent();
   requestAnimationFrame(frame);
 })(window.GM);

@@ -1,7 +1,7 @@
 // gravity-melee :: rendering — baked pixel planet/moon, camera-space HUD, menus
 (function (GM) {
   const { U } = GM;
-  const R = { planetCv: null, moonCv: null };
+  const R = { planetCv: null, moonCv: null, planetImg: null, planetFrames: null, planetKey: null };
 
   R.init = () => {
     R.planetCv = bakePlanet(GM.PHYS.planet.r, [
@@ -10,6 +10,71 @@
     R.moonCv = bakePlanet(GM.PHYS.moon.r, [
       '#2a2d36', '#3c414e', '#565d6e', '#6e778a', '#8b95ab',
     ]);
+    R.pickPlanet();
+  };
+
+  // ---- Star Control II planet discs (js/content.js, CC BY-NC-SA 2.5) ----
+  // Each match picks a random SC2 world. Gas giants, magma, the Rainbow
+  // Worlds and radioactive worlds get palette-cycled "flowing" frames, the
+  // classic color-table animation trick from the original game.
+  R.pickPlanet = () => {
+    R.planetImg = null;
+    R.planetFrames = null;
+    const C = GM.CONTENT;
+    const keys = C && C.planets ? Object.keys(C.planets) : [];
+    if (!keys.length) return;
+    const key = U.pick(keys);
+    R.planetKey = key;
+    const img = new Image();
+    img.onload = () => {
+      if (R.planetKey !== key) return;   // a new match re-picked meanwhile
+      const cv = document.createElement('canvas');
+      cv.width = img.width; cv.height = img.height;
+      cv.getContext('2d').drawImage(img, 0, 0);
+      R.planetImg = cv;
+      if (C.cycle.includes(key)) R.bakeCycle(cv);
+    };
+    img.src = C.planets[key];
+  };
+
+  // pre-bake N palette-rotation frames: every pixel's color advances along
+  // the luminance-sorted palette ramp, one step per frame
+  R.bakeCycle = (src) => {
+    const w = src.width, h = src.height;
+    const d = src.getContext('2d').getImageData(0, 0, w, h).data;
+    const seen = new Map();
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 16) continue;
+      seen.set((d[i] << 16) | (d[i + 1] << 8) | d[i + 2], 0);
+    }
+    if (seen.size < 2) return;
+    const lum = (c) => ((c >> 16) & 255) * 0.3 + ((c >> 8) & 255) * 0.6 + (c & 255) * 0.1;
+    const ramp = [...seen.keys()].sort((a, b) => lum(a) - lum(b));
+    const idx = new Map(ramp.map((c, i) => [c, i]));
+    const N = 12;
+    R.planetFrames = [];
+    for (let f = 0; f < N; f++) {
+      const fd = new Uint8ClampedArray(d.length);
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] < 16) continue;
+        const k = ramp[(idx.get((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]) + f) % ramp.length];
+        fd[i] = k >> 16; fd[i + 1] = (k >> 8) & 255; fd[i + 2] = k & 255; fd[i + 3] = 255;
+      }
+      const fcv = document.createElement('canvas');
+      fcv.width = w; fcv.height = h;
+      fcv.getContext('2d').putImageData(new ImageData(fd, w, h), 0, 0);
+      R.planetFrames.push(fcv);
+    }
+  };
+
+  // the planet canvas to draw this frame: cycled frame, plain SC2 disc, or
+  // the baked procedural fallback while the image loads
+  R.planetFrame = (t) => {
+    if (!R.planetImg) return R.planetCv;
+    if (R.planetFrames && R.planetFrames.length) {
+      return R.planetFrames[Math.floor((t || 0) * 9) % R.planetFrames.length];
+    }
+    return R.planetImg;
   };
 
   function bakePlanet(r, ramp) {
@@ -85,9 +150,14 @@
     g.fillStyle = grd;
     g.beginPath(); g.arc(e2.x, e2.y, glowR + 10 * zs, 0, U.TAU); g.fill();
 
-    // planet body (scaled with zoom; nearest-neighbor keeps the pixel look)
-    const pd = Math.max(2, Math.round(P.r * 2 * zs));
-    g.drawImage(R.planetCv, (e2.x - pd / 2) | 0, (e2.y - pd / 2) | 0, pd, pd);
+    // planet body: the picked Star Control II disc (palette-cycled for gas/
+    // rainbow worlds), positioned by its .ani anchor point; procedural
+    // baked disc as fallback
+    const pcv = R.planetFrame(t);
+    const ph = Math.max(2, Math.round(P.r * 2 * zs));
+    const pw = Math.max(2, Math.round(ph * pcv.width / pcv.height));
+    const an = (GM.CONTENT.anchors && GM.CONTENT.anchors[R.planetKey]) || [pcv.width / 2, pcv.height / 2];
+    g.drawImage(pcv, (e2.x - pw * an[0] / pcv.width) | 0, (e2.y - ph * an[1] / pcv.height) | 0, pw, ph);
 
     // surge pulses
     if (surgeGlow) {

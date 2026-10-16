@@ -51,6 +51,37 @@
     n.start(t0); n.stop(t0 + dur);
   }
 
+  // ---- embedded Star Control II sounds (js/content.js, CC BY-NC-SA 2.5) ----
+  // Decoded once at boot; every play falls back to the synthesized set if a
+  // buffer is missing or the browser refuses to decode.
+  A.buffers = null;
+  A.loadContent = async () => {
+    if (!AC || !GM.CONTENT || !GM.CONTENT.wavs || A.buffers) return;
+    const ctx = A.ensure();
+    if (!ctx) return;
+    A.buffers = {};
+    for (const [name, uri] of Object.entries(GM.CONTENT.wavs)) {
+      try {
+        const raw = atob(uri.split(',')[1]);
+        const buf = new ArrayBuffer(raw.length);
+        const u8 = new Uint8Array(buf);
+        for (let i = 0; i < raw.length; i++) u8[i] = raw.charCodeAt(i);
+        A.buffers[name] = await ctx.decodeAudioData(buf);
+      } catch (e) { /* synthesized fallback stays for this sound */ }
+    }
+  };
+  A.playBuf = (n, vol = 1, rate = 1) => {
+    if (!A.ctx || A.muted || GM.SILENT || !A.buffers || !A.buffers[n]) return false;
+    const src = A.ctx.createBufferSource();
+    src.buffer = A.buffers[n];
+    src.playbackRate.value = rate;
+    const g = A.ctx.createGain();
+    g.gain.value = vol;
+    src.connect(g); g.connect(A.master);
+    src.start();
+    return true;
+  };
+
   A.SND = {
     laser:   () => { tone(880, 0.07, 'square', 0.10, 0.4); },
     pellet:  () => { tone(700, 0.05, 'square', 0.08, 0.5); },
@@ -65,7 +96,27 @@
     burn:    () => { noise(0.45, 0.10, 520, 0.7); tone(240, 0.40, 'sawtooth', 0.08, 1.9); },
     hit:     () => { noise(0.06, 0.16, 900, 0.9); },
     crunch:  () => { noise(0.20, 0.28, 260, 0.8); tone(90, 0.18, 'sawtooth', 0.20, 0.4); },
-    boom:    () => { noise(0.55, 0.34, 180, 0.6); tone(70, 0.5, 'sawtooth', 0.26, 0.3); tone(45, 0.7, 'sine', 0.24, 0.5, 0.05); },
+    boom:    (dmg) => {
+      // Star Control II tiered melee booms (boom1/23/45/67 by crew damage);
+      // fall back to the synthesized explosion until buffers are decoded.
+      let n = 'boom45';
+      if (dmg !== undefined) {
+        if (dmg < 2.5) n = 'boom1';
+        else if (dmg < 5.5) n = 'boom23';
+        else if (dmg < 9.5) n = 'boom45';
+        else n = 'boom67';
+      }
+      if (A.playBuf(n, 0.9)) return;
+      noise(0.55, 0.34, 180, 0.6); tone(70, 0.5, 'sawtooth', 0.26, 0.3); tone(45, 0.7, 'sine', 0.24, 0.5, 0.05);
+    },
+    dies:    () => {
+      if (A.playBuf('shipdies', 1)) return;
+      noise(0.7, 0.34, 150, 0.5); tone(50, 0.9, 'sawtooth', 0.28, 0.4);
+    },
+    crew:    () => {
+      if (A.playBuf('getcrew', 0.8)) return;
+      tone(400, 0.10, 'sine', 0.14, 2.0); tone(800, 0.12, 'sine', 0.10, 2.0, 0.06);
+    },
     thrust:  () => {},  // continuous loop not worth it; jets are silent
     surge:   () => { tone(60, 0.8, 'sawtooth', 0.16, 1.6); noise(0.7, 0.10, 150, 0.5); },
     ui:      () => { tone(660, 0.05, 'square', 0.10, 1); },

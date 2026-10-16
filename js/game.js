@@ -162,7 +162,7 @@
     }
 
     explode(x, y, dmg, rad, by, kind) {
-      GM.A.SND.boom();
+      GM.A.SND.boom(dmg);
       GM.FX.addShake(4);
       GM.FX.addFlash(0.08);
       GM.FX.emit(x, y, 20, { spd: 130, life: 0.6, col: '#ffd28a', size: 2 });
@@ -437,7 +437,7 @@
               f.by.crew = Math.min(f.by.crewMax, f.by.crew + 1);
               GM.FX.float(f.by.x, f.by.y - 18, '+1 CREW', '#9dff7a');
               GM.FX.emit(f.x, f.y, 6, { spd: 40, life: 0.4, col: '#9dff7a', size: 1.5 });
-              GM.A.SND.possess();
+              GM.A.SND.crew();   // SC2 getcrew: the crew-transfer sound
               dead = true;
             }
           }

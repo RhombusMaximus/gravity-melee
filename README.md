@@ -69,6 +69,8 @@ squadron from the moment the match starts, no lock-in press needed.
 
 - **Online multiplayer** — next phase (WebRTC peer-to-peer or lightweight
   relay; the sim is already deterministic-ish per fixed-step)
+- **SC2 melee music** — the original battle module (`battle.mod`) as the
+  match soundtrack
 - Persistent pilot records (kills per archetype)
 
 ## HUD
@@ -138,8 +140,23 @@ numbers (42 crew, 42 battery):
 
 Vanilla JS + HTML5 canvas at 640×360 (camera follows the player across a
 2796×1290 world), upscaled with `image-rendering: pixelated`. Ships are
-13×12 pixel-art string maps rendered at 2×; the planet/moon are baked
-per-pixel once at boot. Audio is synthesized WebAudio — zero assets anywhere.
+13×12 pixel-art string maps rendered at 2×; the moon is baked per-pixel
+once at boot. Audio is synthesized WebAudio — plus the original Star
+Control II melee sounds (see credits).
+
+## Content & credits
+
+Every match now plays on a random Star Control II world — the actual
+planet discs from The Ur-Quan Masters (gas giants, magma worlds, the
+Rainbow Worlds…), with palette-cycled flowing animation for the banded
+types, the classic SC2 color-table trick. Damage plays the original
+tiered melee booms (`boom1/23/45/67`, bigger hits = deeper boom), ship
+deaths play `shipdies`, and fighter docking plays the crew-transfer sound.
+
+**Planet graphics and melee sound effects are Star Control II content,
+© Toys for Bob, distributed via The Ur-Quan Masters, licensed
+CC BY-NC-SA 2.5** — see `assets/LICENSE-content.md`. Everything else in
+this repository is MIT. The game is and remains noncommercial.
 
 ## License
 

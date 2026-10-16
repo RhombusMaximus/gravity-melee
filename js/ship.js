@@ -240,6 +240,7 @@
       if (by) this.lastHitBy = by;
       GM.A.SND.hit();
       GM.FX.emit(this.x, this.y, 4, { spd: 70, life: 0.35, col: '#ff8a6a', size: 1.5 });
+      GM.A.SND.boom(amt);   // SC2 tiered melee boom by damage amount
       if (this.crew <= 0) this.die(world, by);
     }
 
@@ -254,7 +255,7 @@
         GM.FX.addShake(9);
         GM.FX.addFlash(0.28);
       }
-      GM.A.SND.boom();
+      GM.A.SND.dies();
       GM.FX.emit(this.x, this.y, 34, { spd: 120 * S, life: 1.0, col: '#ffd28a', size: 2.5 });
       GM.FX.emit(this.x, this.y, 18, { spd: 60 * S, life: 0.8, col: '#ff7a4a', size: 2 });
       GM.FX.emit(this.x, this.y, 12, { spd: 200 * S, life: 0.5, col: '#fff', size: 1.5 });
