@@ -305,11 +305,14 @@
       const w = U.wrapDelta(me.x, me.y, tgt.x, tgt.y);
       const dist = U.len(w.x, w.y);
       const z = GM.ZOOM;
-      // dist close->far maps to zoom max->min (smoothstep)
+      // dist close->far maps to zoom max->min (smoothstep: gradual at mid-range,
+      // steeper near close — keeps the target inside the viewport)
       const t = U.clamp((dist - z.close) / (z.far - z.close), 0, 1);
-      zoomWant = z.max - (z.max - z.min) * t;
-      // frame the duel: bias the camera midpoint toward the target
-      const bias = 0.22 * (1 - t);   // stronger pull when zoomed in
+      const tt = t * t * (3 - 2 * t);   // smoothstep: 0→1 with ease-in/out
+      zoomWant = z.max - (z.max - z.min) * tt;
+      // frame the duel: bias the camera midpoint toward the target —
+      // stronger pull when zoomed in, so the target stays on-screen
+      const bias = 0.30 * (1 - tt);   // up to 30% pull when at max zoom
       fx = U.wrapX(fx + w.x * bias);
       fy = U.wrapY(fy + w.y * bias);
     }

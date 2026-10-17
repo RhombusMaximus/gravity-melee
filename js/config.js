@@ -1,6 +1,6 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.9.4';
+  GM.VERSION = '0.9.5';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
@@ -19,7 +19,7 @@
   // dynamic zoom: canvas px per world unit. Zooms in as the player closes on
   // their target (SC2-style framing), lerped smoothly by updateCamera.
   GM.zoomCur = 1;
-  GM.ZOOM = { min: 1, max: 2.5, close: 350, far: 1400 };
+  GM.ZOOM = { min: 1, max: 2.0, close: 300, far: 1200 };
 
   GM.PHYS = {
     dt: 1 / 60,
