@@ -355,8 +355,8 @@
             g.strokeRect(e.x - q, e.y - q, q * 2, q * 2);
             g.globalAlpha = 1;
           }
-          return;
         }
+        return;   // SC2 ships have no string-map art; never fall through
       }
 
       // string-map pixel art path (original ships)
