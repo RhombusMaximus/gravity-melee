@@ -99,7 +99,7 @@
     }
 
     if (GM.state === 'victory') {
-      if (c === 'KeyR') startGame(GM.world.mode);
+      if (c === 'KeyR') startGame(GM.world.mode, GM.lastPicks);
       else if (c === 'Escape') { GM.state = 'title'; GM.A.startMusic('hyper'); }
       return;
     }
@@ -274,6 +274,10 @@
   // ---------- game flow ----------
   function startGame(mode, picks) {
     GM.world = new GM.World(mode, picks ? { picks } : {});
+    // capture the actual deployed ships for rematch (same fleet matchup)
+    GM.lastPicks = GM.world.teams.map(function (team) {
+      return team.map(function (s) { return s.spec.key; });
+    });
     GM.state = 'play';
     GM.paused = false;
     GM.humanShip = null;
