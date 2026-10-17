@@ -35,6 +35,19 @@
       });
     }
 
+    // Music: try to resume on EVERY keydown (each is a user gesture —
+    // Chrome won't let resume() work outside a gesture, and the context
+    // gets re-suspended during the multi-second async mod rendering)
+    if (GM.A.musicReady && GM.A.musicOn && !GM.A.musicSrc && GM.state === 'title') {
+      GM.A.startMusic('hyper');
+    } else if (GM.A.musicReady && GM.A.musicOn && !GM.A.musicSrc && GM.state === 'play') {
+      GM.A.startMusic('battle');
+    }
+    // If the context is suspended, force-resume it (this IS a user gesture)
+    if (GM.A.ctx && GM.A.ctx.state === 'suspended') {
+      GM.A.ctx.resume();
+    }
+
     if (keys[e.code]) return;      // ignore autorepeat
     keys[e.code] = true;
 
@@ -424,5 +437,6 @@
   GM.FX.init();
   GM.R.init();
   if (GM.A.loadContent) GM.A.loadContent();
+  if (GM.preloadSprites) GM.preloadSprites();   // decode SC2 sprites early
   requestAnimationFrame(frame);
 })(window.GM);

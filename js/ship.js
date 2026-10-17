@@ -12,6 +12,18 @@
     return img;
   }
 
+  // kick off decoding for all SC2 ship sprites at load time so they're
+  // never invisible during the first frames of a match
+  function preloadSprites() {
+    const C = GM.CONTENT;
+    if (!C || !C.shipsprites) return;
+    for (const sp of GM.SHIPS) {
+      if (sp.sprite && !SPRITE_CACHE[sp.sprite]) {
+        getSprite(sp.sprite);
+      }
+    }
+  }
+
   class Ship {
     constructor(spec, team, name, aiProfile) {
       this.spec = spec;
@@ -358,6 +370,8 @@
         }
         return;   // SC2 ships have no string-map art; never fall through
       }
+      // NOTE: if a sprite ship's image hasn't decoded yet (rare after
+      // preloadSprites), it's invisible for one frame — acceptable
 
       // string-map pixel art path (original ships)
       const art = this.spec.art;
@@ -394,4 +408,5 @@
   }
 
   GM.Ship = Ship;
+  GM.preloadSprites = preloadSprites;
 })(window.GM);
