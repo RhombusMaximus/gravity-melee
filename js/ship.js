@@ -361,6 +361,7 @@
 
       // string-map pixel art path (original ships)
       const art = this.spec.art;
+      const w = art[0].length, h = art.length;
 
       g.save();
       g.translate(e.x, e.y);
