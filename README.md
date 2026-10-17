@@ -48,7 +48,8 @@ teams auto-fill under the same budget, so nobody fields an unfair fleet.
 | P | pause |
 | M | mute |
 | N | music on/off (x2 louder) |
-| [ / ] | volume down / up |
+| [ / ] | volume down / up (master) |
+| ; / ' | SFX volume down / up |
 | - / = | simulation speed ×0.25 … ×4 |
 
 ## Squadron control

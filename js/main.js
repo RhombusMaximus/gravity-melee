@@ -62,6 +62,12 @@
       GM.A.SND.ui();
       return;
     }
+    if (c === 'Semicolon' || c === 'Quote') {
+      if (c === 'Semicolon') GM.A.sfxDown();
+      else GM.A.sfxUp();
+      GM.A.SND.ui();
+      return;
+    }
     if (c === 'KeyP' && GM.state === 'play') { GM.paused = !GM.paused; GM.A.SND.ui(); return; }
     if (c === 'KeyG') { GM.debugAI = !GM.debugAI; return; }
     if (c === 'Minus' || c === 'Equal') {

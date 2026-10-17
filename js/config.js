@@ -1,6 +1,6 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.9.8';
+  GM.VERSION = '0.10.0';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
@@ -23,9 +23,9 @@
 
   GM.PHYS = {
     dt: 1 / 60,
-    planet: { x: 1398, y: 645, r: 62, GM: 2246400, rInf: 408, knee: 331, aCap: 1248 },
-    moon:   { r: 19, GM: 126720, rInf: 168, knee: 125, aCap: 720, orbitR: 317, omega: 0.34 },
-    spawnR: 221,
+    planet: { x: 1398, y: 645, r: 90, GM: 2246400, rInf: 480, knee: 390, aCap: 1248 },
+    moon:   { r: 26, GM: 126720, rInf: 200, knee: 150, aCap: 720, orbitR: 360, omega: 0.34 },
+    spawnR: 260,
     surgeAt: 170,
     surgeRate: 0.02,
     surgeMax: 3.0,

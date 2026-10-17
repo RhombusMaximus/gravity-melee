@@ -27,6 +27,10 @@
   };
   A.vol = 0.22;
   A.sfxLevel = 0.4;   // SFX bus gain (lower than the music's 0.7)
+  A.sfxVol = 0.4;     // user-adjustable SFX level (; down, ' up)
+  A.sfxVolStep = 0.06;
+  A.sfxUp = () => { A.sfxVol = Math.min(1, +(A.sfxVol + A.sfxVolStep).toFixed(2)); if (A.sfx) A.sfx.gain.value = A.sfxVol; return A.sfxVol; };
+  A.sfxDown = () => { A.sfxVol = Math.max(0, +(A.sfxVol - A.sfxVolStep).toFixed(2)); if (A.sfx) A.sfx.gain.value = A.sfxVol; return A.sfxVol; };
   A.volStep = 0.04;
   A.volUp = () => { A.vol = Math.min(0.6, +(A.vol + A.volStep).toFixed(2)); if (!A.muted && A.master) A.master.gain.value = A.vol; return A.vol; };
   A.volDown = () => { A.vol = Math.max(0, +(A.vol - A.volStep).toFixed(2)); if (!A.muted && A.master) A.master.gain.value = A.vol; return A.vol; };
