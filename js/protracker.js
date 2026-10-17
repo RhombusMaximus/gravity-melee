@@ -400,7 +400,9 @@
       var freq = AMIGA_CLOCK / p;
       ch.pos += freq / this.sampleRate;
       var i = ch.pos | 0;
-      var loops = smp.repeatLength >= 2;
+      // ProTracker: repeatLength of 1 word (2 bytes) = "no loop" marker.
+      // Must be > 2 bytes (i.e., at least 2 words) to actually loop.
+      var loops = smp.repeatLength > 2;
       if (loops) {
         // wrap within the loop region, PRESERVING the fractional position
         var end = smp.repeatOffset + smp.repeatLength;
