@@ -44,7 +44,7 @@
       GM.A.stopMusic();   // clear the dead source so startMusic can retry
       GM.A.ctx.resume();
     }
-    if (GM.A.musicReady && GM.A.musicOn && !GM.A.musicSrc && GM.state === 'title') {
+    if (GM.A.musicReady && GM.A.musicOn && !GM.A.musicSrc && (GM.state === 'title' || GM.state === 'select')) {
       GM.A.startMusic('hyper');
     } else if (GM.A.musicReady && GM.A.musicOn && !GM.A.musicSrc && GM.state === 'play') {
       GM.A.startMusic('battle');
@@ -258,6 +258,10 @@
     GM.sel = sel;
     GM.state = 'select';
     GM.A.SND.ui();
+    // try to start the hyperspace theme right now — the user just
+    // pressed a key (this IS a user gesture), so the AudioContext
+    // should be running and startMusic should succeed
+    GM.A.startMusic('hyper');
   }
 
   function deploySelection() {
