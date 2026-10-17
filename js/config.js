@@ -1,6 +1,6 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.9.7';
+  GM.VERSION = '0.9.8';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
@@ -273,6 +273,10 @@
     sp.weapon.size *= 3;
     if (sp.weapon.aoe) sp.weapon.aoe *= S;
     // resolve SC2 sprite references to data URIs from content.js
+    // NOTE: this often runs BEFORE content.js loads, so the resolution
+    // fails silently — preloadSprites() in ship.js re-resolves at boot
+    // after all scripts are loaded. This is kept as a best-effort early
+    // attempt (harmless if content.js isn't available yet).
     if (sp.sprite && sp.sprite.startsWith('SHIP:') && GM.CONTENT && GM.CONTENT.shipsprites) {
       sp.sprite = GM.CONTENT.shipsprites[sp.sprite.slice(5)] || null;
     }

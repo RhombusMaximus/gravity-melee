@@ -13,11 +13,19 @@
   }
 
   // kick off decoding for all SC2 ship sprites at load time so they're
-  // never invisible during the first frames of a match
+  // never invisible during the first frames of a match.
+  // ALSO resolves 'SHIP:<species>' references to data URIs — this must
+  // run AFTER content.js loads, which is why it's here and not in
+  // config.js's normalization loop (config.js loads before content.js).
   function preloadSprites() {
     const C = GM.CONTENT;
     if (!C || !C.shipsprites) return;
     for (const sp of GM.SHIPS) {
+      // resolve 'SHIP:kohrah' -> data URI from content.js
+      if (sp.sprite && sp.sprite.startsWith('SHIP:')) {
+        sp.sprite = C.shipsprites[sp.sprite.slice(5)] || null;
+      }
+      // kick off image decoding
       if (sp.sprite && !SPRITE_CACHE[sp.sprite]) {
         getSprite(sp.sprite);
       }
