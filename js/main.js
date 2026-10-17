@@ -35,17 +35,19 @@
       });
     }
 
-    // Music: try to resume on EVERY keydown (each is a user gesture —
-    // Chrome won't let resume() work outside a gesture, and the context
-    // gets re-suspended during the multi-second async mod rendering)
+    // Music keepalive: on EVERY keydown, fix suspended contexts and
+    // restart dead sources. Each keydown IS a user gesture, so resume()
+    // always works here. The key: STOP the dead source FIRST, then
+    // resume, then start a fresh source — a source started on a
+    // suspended context produces silence forever.
+    if (GM.A.ctx && GM.A.ctx.state === 'suspended') {
+      GM.A.stopMusic();   // clear the dead source so startMusic can retry
+      GM.A.ctx.resume();
+    }
     if (GM.A.musicReady && GM.A.musicOn && !GM.A.musicSrc && GM.state === 'title') {
       GM.A.startMusic('hyper');
     } else if (GM.A.musicReady && GM.A.musicOn && !GM.A.musicSrc && GM.state === 'play') {
       GM.A.startMusic('battle');
-    }
-    // If the context is suspended, force-resume it (this IS a user gesture)
-    if (GM.A.ctx && GM.A.ctx.state === 'suspended') {
-      GM.A.ctx.resume();
     }
 
     if (keys[e.code]) return;      // ignore autorepeat

@@ -19,9 +19,9 @@ import subprocess
 import sys
 
 # Curated planet types (visual variety; CYCLE = palette-animated flowing look)
-PLANETS = ['bluegas', 'purplegas', 'magma', 'samatra', 'treasure',
+PLANETS = ['bluegas', 'purplegas', 'magma', 'organic', 'emerald',
            'radioactive', 'water', 'dust']
-CYCLE = ['bluegas', 'purplegas', 'magma', 'samatra', 'radioactive']
+CYCLE = ['bluegas', 'purplegas', 'magma', 'organic', 'radioactive']
 WAVS = ['boom1', 'boom23', 'boom45', 'boom67', 'getcrew', 'shipdies']
 # SC2 music modules (ProTracker .mod, played by js/protracker.js)
 MODS = {'battle': 'battle/battle.mod', 'hyper': 'nav/hyper.mod'}

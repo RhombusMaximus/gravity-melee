@@ -352,14 +352,10 @@
           const sh = img.naturalHeight * PS;
           g.imageSmoothingEnabled = false;
           g.drawImage(img, -sw / 2, -sh / 2, sw, sh);
-          // team-color tint: draw a colored rect with 'source-atop' blend
-          g.globalCompositeOperation = 'source-atop';
-          g.fillStyle = T.P;
-          g.globalAlpha = 0.12;
-          g.fillRect(-sw, -sh, sw * 2, sh * 2);
-          g.globalAlpha = 1;
-          g.globalCompositeOperation = 'source-over';
           g.restore();
+          // NOTE: no team tint on SC2 sprites — 'source-atop' on the
+          // shared world canvas would tint the star field in a visible
+          // rectangle; the sprites have their own colors already
           if (this.hitT > 0) {
             g.globalAlpha = 0.5;
             g.fillStyle = '#fff';
