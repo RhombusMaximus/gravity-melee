@@ -108,7 +108,11 @@
     const ctx = A.ensure();
     if (!ctx) return;
     A.musicBuffers = {};
-    for (const name of Object.keys(GM.CONTENT.mods)) {
+    // render hyper FIRST (title screen needs it) — start playing as soon
+    // as it's ready; battle renders in the background
+    const names = Object.keys(GM.CONTENT.mods);
+    names.sort(function (a, b) { return (a === 'hyper' ? -1 : 0) - (b === 'hyper' ? -1 : 0); });
+    for (const name of names) {
       try {
         const raw = atob(GM.CONTENT.mods[name].split(',')[1]);
         const bytes = new Uint8Array(raw.length);
@@ -118,9 +122,11 @@
         const buf = ctx.createBuffer(1, pcm.length, sampleRate);
         buf.copyToChannel(pcm, 0);
         A.musicBuffers[name] = buf;
+        // as soon as hyper is ready, mark ready (battle continues rendering)
+        if (name === 'hyper') A.musicReady = true;
       } catch (e) { /* skip this track */ }
     }
-    A.musicReady = Object.keys(A.musicBuffers).length > 0;
+    if (!A.musicReady) A.musicReady = Object.keys(A.musicBuffers).length > 0;
   };
 
   A.startMusic = (track) => {
@@ -131,7 +137,6 @@
     if (!buf) return;
     const ctx = A.ensure();
     if (!ctx) return;
-    if (ctx.state === 'suspended') ctx.resume();
     const src = ctx.createBufferSource();
     src.buffer = buf;
     src.loop = true;
@@ -139,7 +144,16 @@
     g.gain.value = A.muted ? 0 : A.musicGainVal;
     src.connect(g);
     g.connect(A.master);   // music rides its own gain → master, NOT the sfx bus
-    src.start();
+    // await the context resume before starting the source — resume() is
+    // async and src.start() on a suspended context produces silence
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(function () { src.start(); }).catch(function () {
+        // retry on next user gesture
+        src.start();
+      });
+    } else {
+      src.start();
+    }
     A.musicSrc = src;
     A.musicGain = g;
     A.musicTrack = track;
