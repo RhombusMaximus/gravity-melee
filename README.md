@@ -120,24 +120,42 @@ the planet or take the fight to them.
 
 ## Ships
 
+The **full Super Melee roster — all 25 ships of Star Control II**, each
+flying its real sprite with stats pulled from the UQM ship sources (crew,
+battery, regen, point costs, weapon damage), its own captain, panel icon
+and original weapon sound:
+
 | Ship | Cost | Role | Weapon | Special |
 |------|------|------|--------|---------|
-| SC-1 Sparrow | 14 | scout | rapid pulse darts | afterburner |
-| TK-4 Vanguard | 19 | cruiser | auto bolt | aegis bubble (brief invulnerability) |
-| HR-9 Colossus | 28 | dreadnought | siege plasma (AoE) | grav pulse (radial shove) |
-| XT-3 Mantis | 21 | skirmisher | 3-shot fragment volley | homing seeker pod |
-| NV-2 Wisp | 23 | artillery | slow heavy lob | blink teleport |
-| RX-5 Bastion | 20 | mine layer | point-defense pellet | sting mines |
-| UQ-42 Kzer-Za | 30 | dreadnought | fusion bolts (rapid, short range) | launch fighters |
-| KH-42 Marauder | 30 | dreadnought | F.R.I.E.D. (expanding ring) | buzzsaw blades |
-| CH-42 Avatar | 28 | heavy cruiser | auto laser (continuous) | satellite screen |
-| YE-20 Terminator | 22 | escort | dual guns (rapid) | tactical shield |
+| SF-6 Scout | 5 | scout | rapid pecker | glory device (suicide nuke) |
+| ZF-10 Stinger | 6 | skirmisher | anti-matter sting | tongue lash (point-blank) |
+| UM-10 Drone | 7 | scout | cone zap | retro-propulsion (backward dash) |
+| IL-22 Avenger | 10 | ambusher | twin fusion spray | cloak |
+| TH-8 Torch | 10 | skirmisher | flame gun | afterburner |
+| EC-18 Cruiser | 11 | cruiser | homing MX missiles | point-defense laser |
+| VX-20 Intruder | 12 | cruiser | megawatt lance | limpet torpedoes (drag the enemy) |
+| SY-12 Penetrator | 13 | boarding | particle beam | psi-mind call (steals crew) |
+| AN-20 Guardian | 15 | brawler | acid bubbles | blazer form (invulnerable comet) |
+| AR-6 Skiff | 16 | scout | auto gun | teleport |
+| SX-12 Blade | 16 | escort | forward gats | vector thrust |
+| DR-14 Mauler | 17 | artillery | heavy shell (recoils!) | furnace (burns crew for battery) |
 | SL-12 Probe | 18 | interceptor | lightning | vector dash |
+| SP-30 Eluder | 18 | skirmisher | front gun | B.U.T.T. missile |
+| ME-20 Trader | 18 | artillery | charged orb | mind blast (homing) |
+| MM-20 X-Form | 19 | interceptor | twin lasers ⇄ twin torpedoes | transform X/Y |
+| PK-8 Fury | 20 | interceptor | triple peck | rebirth |
+| MY-20 Podship | 21 | artillery | homing plasma | crew regeneration |
+| YE-20 Terminator | 22 | escort | dual guns (rapid) | tactical shield |
+| UT-20 Jugger | 22 | escort | forward gat | absorber shield (no regen) |
+| OR-16 Nemesis | 23 | boarding | howitzer | marines |
+| CH-42 Avatar | 28 | heavy cruiser | auto laser (continuous) | satellite screen |
+| CJ-36 Broodhome | 28 | dreadnought | photon crystal (AoE) | DOGI crystals |
+| KH-42 Marauder | 30 | dreadnought | F.R.I.E.D. (expanding ring) | buzzsaw blades |
+| UQ-42 Dreadnought | 30 | dreadnought | fusion bolts (rapid, short range) | launch fighters |
 
-### UQ-42 Kzer-Za — the Dreadnought clone
+### UQ-42 Dreadnought — the real one
 
-A faithful homage to the Ur-Quan Dreadnought, tuned to the original binary's
-numbers (42 crew, 42 battery):
+The flagship itself, 42 crew and 42 battery straight from urquan.c:
 
 - **Fusion bolts** — rapid, short-range green plasma; your bolts pass through
   your own fighters.
@@ -152,10 +170,12 @@ numbers (42 crew, 42 battery):
 ## Tech
 
 Vanilla JS + HTML5 canvas at 640×360 (camera follows the player across a
-2796×1290 world), upscaled with `image-rendering: pixelated`. Ships are
-13×12 pixel-art string maps rendered at 2×; the moon is baked per-pixel
-once at boot. Audio is synthesized WebAudio — plus the original Star
-Control II melee sounds (see credits).
+2796×1290 world), upscaled with `image-rendering: pixelated`. Every ship
+flies its real Star Control II sprite; the corner status panels are the
+original melee HUD (animated captain windows, crew as green dots). The
+moon is baked per-pixel once at boot. Audio is synthesized WebAudio —
+plus the original SC2 melee sounds, including each race's own weapon
+sounds (see credits).
 
 ## Content & credits
 
@@ -173,6 +193,12 @@ ProTracker player. `N` toggles music, `M` mutes everything.
 The corner status panels come straight from the original too: the
 animated captain windows and ship stamps are the actual UQM melee HUD
 art, and crew is counted out in green dots exactly like 1992.
+
+And with the full roster aboard, every race fires with its own
+**original weapon sound** — the actual primary/secondary WAVs straight
+from each ship's directory (the Umgah's cone-zap, the Ilwrath cloaking
+field, the VUX limpet bite…). Stats come from the UQM ship sources as
+well: crew, battery, regen, Super Melee point costs and weapon damage.
 
 **Planet graphics, melee sound effects, ship sprites, music, captain
 window animations and panel icons are Star Control II content,

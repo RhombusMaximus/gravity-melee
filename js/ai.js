@@ -27,7 +27,7 @@
   }
 
   function pickTarget(s, world) {
-    const foes = world.ships.filter((f) => !f.dead && f.team !== s.team);
+    const foes = world.ships.filter((f) => !f.dead && f.team !== s.team && !(f.cloakT > 0));
     if (!foes.length) return null;
     // sticky lock: keep the current target unless someone else is much closer
     const cur = s.aiBrain ? s.aiBrain.tgt : null;
@@ -125,7 +125,7 @@
     if (world.winner === s.team) { victoryPilot(s, b, world, dt); return; }
 
     const arch = s.ai;
-    const w = s.spec.weapon;
+    const w = s.spec.forms ? s.spec.forms[s.form].weapon : s.spec.weapon;
     const P = GM.PHYS.planet;
 
     b.modeT += dt;
@@ -250,11 +250,45 @@
       turn = U.clamp(turn + b.jinkDir * 0.55 * arch.jink, -1, 1);
     }
 
+    // ---- X-Form doctrine: run them down in X, stand off and torp in Y ----
+    if (s.spec.forms && s.scd <= 0) {
+      const want = (b.mode === 'approach' || dist > 160 * S || !b.los) ? 'x' : 'y';
+      if (s.form !== want) s.useSpecial(world);
+    }
+
     // ---- specials ----
     if (s.scd <= 0 && s.batt >= s.spec.special.cost * 1.15) {
       const sp = s.spec.special;
       let use = false;
       switch (sp.type) {
+        case 'pointdef':
+          use = dist < 160 * S && tgt.totalShots > 0;
+          break;
+        case 'cloak':
+          use = battFrac > 0.5 && dist > 80 * S && dist < 240 * S && U.chance(0.5);
+          break;
+        case 'blazer':
+          use = dist < 95 * S && battFrac > 0.3;
+          break;
+        case 'zap':
+          use = dist < 60 * S + tgt.r;
+          break;
+        case 'call':
+          use = dist < 190 * S && crewFrac < 0.85;
+          break;
+        case 'glory':
+          use = s.crew <= 2 && dist < 110 * S && tgt.crew > s.crew * 3;
+          break;
+        case 'furnace':
+          use = s.batt < s.battMax * 0.3 && s.crew > 6;
+          break;
+        case 'reverse':
+          use = (planetDist < P.r + 46 * S && U.chance(0.6)) ||
+                (dist < 60 * S && U.chance(0.4));
+          break;
+        case 'limpet':
+          use = dist < 150 * S && U.chance(0.6);
+          break;
         case 'afterburner':
           use = (dist > 70 * S && b.mode === 'approach') ||
                 (planetDist < P.r + 40 * S && U.chance(0.5));

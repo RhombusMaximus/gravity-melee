@@ -45,6 +45,8 @@
       this.batt = spec.batt * 0.8; this.battMax = spec.batt;
       this.shield = 0;
       this.wcd = 0; this.scd = 0;
+      this.form = 'x';   // Mmrnmhrm X-Form (spec.forms present)
+      this.slowT = 0; this.pdT = 0; this.cloakT = 0; this.blazerT = 0;
       this.burn = 0; this.burnActive = false;
       this.strafing = 0;
       this.mines = [];
@@ -64,15 +66,23 @@
 
     applyInput(dt) {
       const s = this.spec;
+      const fm = s.forms ? s.forms[this.form] : s;   // X-Form stats per form
       const want = this.human ? this.humanInput : this.ctrl;
       const thrust = want.thrust || 0;
       const turn = want.turn || 0;
       const strafe = want.strafe || 0;   // Q/E lateral thrust
 
-      this.thrusting = thrust > 0;
-      this.ang += turn * s.turn * dt;
+      // VUX limpets: glued limpets drag the hull (turn + thrust)
+      const slowK = this.slowT > 0 ? 0.55 : 1;
+      this.slowT = Math.max(0, this.slowT - dt);
+      this.pdT = Math.max(0, this.pdT - dt);
+      this.cloakT = Math.max(0, this.cloakT - dt);
 
-      let accel = s.accel * thrust;
+      this.thrusting = thrust > 0;
+      this.ang += turn * fm.turn * slowK * dt;
+
+      let accel = fm.accel * slowK * thrust;
+      if (this.blazerT > 0) accel = fm.accel * 1.5;   // comet: always thrusting
       if (thrust > 0 && this.burnActive) accel *= 2.1;
       if (accel) {
         this.vx += Math.cos(this.ang) * accel * dt;
@@ -80,7 +90,7 @@
       }
       // strafe: lateral thrust at 60% power (keeps the nose authoritative)
       if (strafe) {
-        const sa = s.accel * 0.6 * strafe;
+        const sa = fm.accel * 0.6 * strafe;
         this.vx += Math.cos(this.ang + Math.PI / 2) * sa * dt;
         this.vy += Math.sin(this.ang + Math.PI / 2) * sa * dt;
         this.strafing = strafe;
@@ -95,7 +105,12 @@
         }
       }
       const v = U.len(this.vx, this.vy);
-      if (v > s.maxSpeed) {
+      if (this.blazerT > 0) {
+        // Blazer comet form: invulnerable, overthrust, burns battery
+        this.batt -= 3 * dt;
+        if (this.batt <= 0) { this.blazerT = 0; this.batt = 0; }
+      }
+      if (v > fm.maxSpeed) {
         const k = s.maxSpeed / v;
         this.vx *= k; this.vy *= k;
       }
@@ -140,6 +155,12 @@
         });
       }
 
+      // Blazer comet trail
+      if (this.blazerT > 0 && U.chance(0.9)) {
+        GM.FX.emit(this.x, this.y, 2, { spd: 20, life: 0.5, col: '#ffb04a', size: 3,
+          vx: this.vx * 0.1, vy: this.vy * 0.1 });
+      }
+
       // mines tick
       for (const m of this.mines) {
         m.t += dt;
@@ -147,7 +168,16 @@
           for (const s2 of world.ships) {
             if (s2.dead || s2 === this || s2.team === this.team) continue;
             const md = U.wrapDelta(m.x, m.y, s2.x, s2.y);
-            if (U.len(md.x, md.y) < this.spec.special.rad + s2.r) { m.explode = true; break; }
+            if (U.len(md.x, md.y) < this.spec.special.rad + s2.r) {
+              if (this.spec.special.slow) {
+                // limpet: glues to the hull and drags it, no blast
+                s2.slowT = Math.max(s2.slowT, this.spec.special.slowDur);
+                s2.damage(this.spec.special.dmg, this, world, 'shot');
+                GM.FX.emit(m.x, m.y, 6, { spd: 30, life: 0.4, col: '#b6ff9e', size: 1.5 });
+                if (!GM.A.playBuf(this.spec.cap + '_limpet_bite', 0.5)) GM.A.SND.hit();
+              }
+              m.explode = true; break;
+            }
           }
         } else if (m.t > 0.5) {
           m.armed = true;
@@ -155,7 +185,9 @@
       }
       this.mines = this.mines.filter((m) => {
         if (m.explode) {
-          world.explode(m.x, m.y, this.spec.special.dmg, this.spec.special.rad, this, 'mine');
+          if (!this.spec.special.slow) {
+            world.explode(m.x, m.y, this.spec.special.dmg, this.spec.special.rad, this, 'mine');
+          }
           return false;
         }
         return m.t < 25;
@@ -164,7 +196,7 @@
 
     fire(world) {
       if (this.wcd > 0 || this.dead) return;
-      const w = this.spec.weapon;
+      const w = this.spec.forms ? this.spec.forms[this.form].weapon : this.spec.weapon;
       if (this.batt < w.cost) return;
       this.batt -= w.cost;
       this.wcd = w.cd;
@@ -174,7 +206,15 @@
         const off = n === 1 ? 0 : (i - (n - 1) / 2) * w.spread * 2.2;
         world.spawnShot(this, this.ang + off + U.rand(-w.spread, w.spread));
       }
-      GM.A.SND[w.snd]();
+      // Druuge recoil: every shell shoves the hull backwards
+      if (w.recoil) {
+        this.vx -= Math.cos(this.ang) * w.recoil;
+        this.vy -= Math.sin(this.ang) * w.recoil;
+      }
+      // the real SC2 weapon sound when the buffer decoded
+      const cap = this.spec.cap;
+      const sndKey = this.spec.forms ? cap + '_primary' + this.form : cap + '_primary';
+      if (!cap || !GM.A.playBuf(sndKey, 0.5)) GM.A.SND[w.snd]();
     }
 
     useSpecial(world) {
@@ -191,6 +231,93 @@
       this.scd = sp.cd;
 
       switch (sp.type) {
+        case 'furnace': {
+          // Druuge: burn a crew member for a fresh battery charge
+          if (this.crew > 1) {
+            this.crew--;
+            this.batt = Math.min(this.battMax, this.batt + sp.gain);
+            GM.FX.float(this.x, this.y - 16, 'CREW BURNED', '#ff9a6a');
+            GM.FX.emit(this.x, this.y, 8, { spd: 60, life: 0.5, col: '#ff9a6a', size: 2 });
+            if (!GM.A.playBuf(this.spec.cap + '_secondary', 0.5)) GM.A.SND.burn();
+          }
+          break;
+        }
+        case 'glory': {
+          // Shofixti: the Glory Device — a suicidal detonation
+          GM.FX.float(this.x, this.y - 18, 'GLORY!', '#ffd28a');
+          world.explode(this.x, this.y, sp.dmg, sp.rad, this, 'blast');
+          this.die(world, null);
+          break;
+        }
+        case 'call': {
+          // Syreen: beg the enemy crew to abandon ship and join us
+          let joined = 0;
+          for (const s2 of world.ships) {
+            if (s2.dead || s2.team === this.team || s2 === this) continue;
+            const wd = U.wrapDelta(this.x, this.y, s2.x, s2.y);
+            if (U.len(wd.x, wd.y) < sp.range + s2.r) {
+              const before = s2.crew;
+              s2.damage(2, this, world, 'shot');
+              joined += Math.max(0, before - s2.crew);
+              GM.FX.emit(s2.x, s2.y, 6, { spd: 90, life: 0.6, col: '#9dff7a', size: 2 });
+            }
+          }
+          if (joined) {
+            this.crew = Math.min(this.crewMax, this.crew + joined);
+            GM.FX.float(this.x, this.y - 18, '+' + joined + ' CREW', '#9dff7a');
+            GM.A.SND.crew();
+          }
+          break;
+        }
+        case 'cloak': {
+          this.cloakT = sp.dur;
+          if (!GM.A.playBuf(this.spec.cap + '_cloak', 0.5)) GM.A.SND.blink();
+          GM.FX.emit(this.x, this.y, 10, { spd: 40, life: 0.4, col: '#8a4aff', size: 2 });
+          break;
+        }
+        case 'blazer': {
+          this.blazerT = sp.dur;
+          GM.A.SND.burn();
+          break;
+        }
+        case 'pointdef': {
+          this.pdT = sp.dur;
+          GM.A.SND.shield();
+          break;
+        }
+        case 'xform': {
+          this.form = this.form === 'x' ? 'y' : 'x';
+          GM.FX.emit(this.x, this.y, 12, { spd: 80, life: 0.4, col: '#9ff0ff', size: 2 });
+          if (!GM.A.playBuf(this.spec.cap + '_secondary', 0.5)) GM.A.SND.ui();
+          break;
+        }
+        case 'reverse': {
+          // Umgah: the famous retro-propulsion kick
+          this.vx -= Math.cos(this.ang) * sp.kick;
+          this.vy -= Math.sin(this.ang) * sp.kick;
+          GM.FX.emit(this.x, this.y, 10, { spd: 70, life: 0.4, col: '#b6ff9e', size: 2 });
+          if (!GM.A.playBuf(this.spec.cap + '_secondary', 0.5)) GM.A.SND.missile();
+          break;
+        }
+        case 'zap': {
+          // Zoq-Fot-Pik: point-blank Tongue lash at the nearest enemy
+          let best = null, bd = 1e9;
+          for (const s2 of world.ships) {
+            if (s2.dead || s2.team === this.team || s2 === this) continue;
+            const wd = U.wrapDelta(this.x, this.y, s2.x, s2.y);
+            const d = U.len(wd.x, wd.y);
+            if (d < bd) { bd = d; best = s2; }
+          }
+          if (best && bd < sp.range + best.r + this.r) {
+            best.damage(sp.dmg, this, world, 'shot');
+            this.totalHits++;
+            GM.FX.addShake(2);
+            GM.FX.emit(this.x + Math.cos(this.ang) * this.r, this.y + Math.sin(this.ang) * this.r, 8,
+              { spd: 60, life: 0.3, col: '#b6ff9e', size: 2 });
+            if (!GM.A.playBuf(this.spec.cap + '_secondary', 0.5)) GM.A.SND.laser();
+          }
+          break;
+        }
         case 'afterburner':
           this.burnActive = true; this.burn = 0;
           GM.A.SND.burn();
@@ -223,7 +350,7 @@
           GM.A.SND.blink();
           break;
         }
-        case 'mine': {
+        case 'mine': case 'limpet': {
           if (this.mines.length >= sp.maxMines) this.mines.shift();
           const back = this.ang + Math.PI;
           this.mines.push({
@@ -261,7 +388,7 @@
 
     damage(amt, by, world, kind) {
       if (this.dead || this.spawnProt > 0) return;
-      if (this.shield > 0 && kind !== 'gravpulse' && kind !== 'crash') {
+      if ((this.shield > 0 || this.blazerT > 0) && kind !== 'gravpulse' && kind !== 'crash') {
         GM.FX.emit(this.x, this.y, 3, { spd: 50, life: 0.3, col: '#8ef2ff', size: 1.5 });
         return;
       }
@@ -344,6 +471,7 @@
       // SC2 sprite path: draw the real Star Control II ship art, rotated
       if (this.spec.sprite) {
         const img = getSprite(this.spec.sprite);
+        const cloaked = this.cloakT > 0;
         if (img.complete && img.naturalWidth > 0) {
           g.save();
           g.translate(e.x, e.y);
@@ -351,12 +479,14 @@
           const sw = img.naturalWidth * PS;
           const sh = img.naturalHeight * PS;
           g.imageSmoothingEnabled = false;
+          g.globalAlpha = cloaked ? 0.13 : 1;   // cloaked: a faint shimmer
           g.drawImage(img, -sw / 2, -sh / 2, sw, sh);
+          g.globalAlpha = 1;
           g.restore();
           // NOTE: no team tint on SC2 sprites — 'source-atop' on the
           // shared world canvas would tint the star field in a visible
           // rectangle; the sprites have their own colors already
-          if (this.hitT > 0) {
+          if (!cloaked && this.hitT > 0) {
             g.globalAlpha = 0.5;
             g.fillStyle = '#fff';
             g.beginPath();

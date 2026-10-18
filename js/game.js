@@ -5,8 +5,9 @@
   const SHOT_COL = {
     dart: '#8ef2ff', bolt: '#ffd070', plasma: '#ff9040',
     shot: '#ff9ad0', lob: '#b6ff9e', pellet: '#e8e0ff', fusion: '#9dff5e',
+    missile: '#ffb04a',
   };
-  const SHOT_GRAV = { dart: 0.25, bolt: 0.3, plasma: 0.8, shot: 0.25, lob: 1.0, pellet: 0.25, fusion: 0.35 };
+  const SHOT_GRAV = { dart: 0.25, bolt: 0.3, plasma: 0.8, shot: 0.25, lob: 1.0, pellet: 0.25, fusion: 0.35, missile: 0.4 };
   const S2 = GM.SCALE;
 
   class World {
@@ -105,7 +106,7 @@
     }
 
     spawnShot(ship, ang) {
-      const w = ship.spec.weapon;
+      const w = ship.spec.forms ? ship.spec.forms[ship.form].weapon : ship.spec.weapon;
       const sx = ship.x + Math.cos(ang) * (ship.r + 2);
       const sy = ship.y + Math.sin(ang) * (ship.r + 2);
       this.shots.push({
@@ -116,6 +117,7 @@
         kind: w.kind, aoe: w.aoe || 0, by: ship,
         col: SHOT_COL[w.kind] || '#fff',
         grav: SHOT_GRAV[w.kind] !== undefined ? SHOT_GRAV[w.kind] : 0.3,
+        turn: w.turn || 0, tgt: null, retgtT: 0,
       });
     }
 
@@ -216,6 +218,32 @@
         if (s.human && s.humanInput && s.humanInput.special) s.useSpecial(this);
       }
 
+      // point-defense lasers (EC-18 Cruiser): sweep enemy shots + fighters
+      for (const s of this.ships) {
+        if (s.dead || !(s.pdT > 0)) continue;
+        const sp = s.spec.special;
+        let zapped = 0;
+        for (let i = this.shots.length - 1; i >= 0; i--) {
+          const sh = this.shots[i];
+          if (sh.team === s.team || sh.by === s) continue;
+          const wd = U.wrapDelta(sh.x, sh.y, s.x, s.y);
+          if (U.len(wd.x, wd.y) < sp.rad) {
+            GM.FX.emit(sh.x, sh.y, 4, { spd: 60, life: 0.3, col: '#ffe98a', size: 1.5 });
+            this.shots.splice(i, 1);
+            zapped++;
+          }
+        }
+        for (const f of this.fighters) {
+          if (f.dead || f.team === s.team) continue;
+          const wd = U.wrapDelta(f.x, f.y, s.x, s.y);
+          if (U.len(wd.x, wd.y) < sp.rad) {
+            f.dead = true; zapped++;
+            GM.FX.emit(f.x, f.y, 8, { spd: 70, life: 0.4, col: '#ffe98a', size: 2 });
+          }
+        }
+        if (zapped) GM.A.SND.laser();
+      }
+
       // moon body collisions
       const mp = this.moonPos();
       for (const s of this.ships) {
@@ -247,6 +275,32 @@
         sh.x = U.wrapX(sh.x + sh.vx * dt);
         sh.y = U.wrapY(sh.y + sh.vy * dt);
         sh.life -= dt;
+        // homing shots (MX missiles, X-Form torpedoes, Mycon plasma):
+        // steer toward the nearest enemy at the weapon's turn rate
+        if (sh.turn > 0) {
+          sh.retgtT -= dt;
+          if (sh.retgtT <= 0 || !sh.tgt || sh.tgt.dead || sh.tgt.cloakT > 0) {
+            sh.retgtT = 0.3;
+            let best = null, bd = 1e9;
+            for (const s of this.ships) {
+              if (s.dead || s.team === sh.team || s.spawnProt > 0 || s.cloakT > 0) continue;
+              const wd = U.wrapDelta(sh.x, sh.y, s.x, s.y);
+              const d2 = U.len(wd.x, wd.y);
+              if (d2 < bd) { bd = d2; best = s; }
+            }
+            sh.tgt = best;
+          }
+          if (sh.tgt) {
+            const wd = U.wrapDelta(sh.x, sh.y, sh.tgt.x, sh.tgt.y);
+            const want = U.ang(wd.x, wd.y);
+            const spd = U.len(sh.vx, sh.vy) || 1;
+            const cur = U.ang(sh.vx, sh.vy);
+            const diff = U.angDiff(cur, want);
+            const na = cur + U.clamp(diff, -sh.turn * dt, sh.turn * dt);
+            sh.vx = Math.cos(na) * spd;
+            sh.vy = Math.sin(na) * spd;
+          }
+        }
         let dead = sh.life <= 0;
 
         // planet
@@ -541,8 +595,11 @@
               GM.FX.addShake(Math.min(3, dmg * 0.3));   // gentle: 6 was too much at 60Hz
               GM.FX.emit((a.x + b.x) / 2, (a.y + b.y) / 2, 12,
                 { spd: 70, life: 0.5, col: '#ff9a6a', size: 2 });
-              if (a.spawnProt <= 0) a.damage(dmg, b, this, 'crash');
-              if (b.spawnProt <= 0) b.damage(dmg, a, this, 'crash');
+              // Blazer comet: the blazing hull grinds the other ship
+              const dmgA = dmg + (b.blazerT > 0 ? 3 : 0);
+              const dmgB = dmg + (a.blazerT > 0 ? 3 : 0);
+              if (a.spawnProt <= 0) a.damage(dmgA, b, this, 'crash');
+              if (b.spawnProt <= 0) b.damage(dmgB, a, this, 'crash');
               a.crashT = 0.5; b.crashT = 0.5;
             }
           }

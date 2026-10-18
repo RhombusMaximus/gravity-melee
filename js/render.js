@@ -839,7 +839,7 @@
     // roster reference line
     g.font = '8px monospace';
     g.fillStyle = '#55688a';
-    g.fillText(GM.SHIPS.map((s) => s.key.toUpperCase() + ' ' + s.cost).join(' · '), GM.VW / 2, GM.VH - 40);
+    g.fillText(GM.SHIPS.length + ' SC2 SHIPS · 5–30 PTS · FULL SUPER MELEE ROSTER', GM.VW / 2, GM.VH - 40);
 
     const blink = Math.sin(t * 3) > -0.3;
     if (blink) {
