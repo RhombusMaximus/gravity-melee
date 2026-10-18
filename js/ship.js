@@ -29,6 +29,14 @@
       if (sp.sprite && !SPRITE_CACHE[sp.sprite]) {
         getSprite(sp.sprite);
       }
+      // X-Form Y-shape sprite (ywing-big) + the Orz howitzer turret
+      if (sp.forms && C.shipsprites[sp.cap + '_yform']) {
+        sp.spriteY = C.shipsprites[sp.cap + '_yform'];
+        getSprite(sp.spriteY);
+      }
+      if (C.shipsprites.orz_turret && !SPRITE_CACHE[C.shipsprites.orz_turret]) {
+        getSprite(C.shipsprites.orz_turret);
+      }
     }
   }
 
@@ -47,6 +55,7 @@
       this.wcd = 0; this.scd = 0;
       this.form = 'x';   // Mmrnmhrm X-Form (spec.forms present)
       this.slowT = 0; this.pdT = 0; this.cloakT = 0; this.blazerT = 0;
+      this.turretOff = 0;   // Orz howitzer turret (hull-relative angle)
       this.burn = 0; this.burnActive = false;
       this.strafing = 0;
       this.mines = [];
@@ -79,7 +88,12 @@
       this.cloakT = Math.max(0, this.cloakT - dt);
 
       this.thrusting = thrust > 0;
-      this.ang += turn * fm.turn * slowK * dt;
+      // Orz turret doctrine (orz.c): hold SPECIAL + turn to swing the howitzer
+      // turret; the hull holds heading while you swing (our refinement of the
+      // original, where the hull turned too — aiming reads far better this way)
+      const turretSteer = s.turret && want.special;
+      this.ang += turretSteer ? 0 : turn * fm.turn * slowK * dt;
+      if (turretSteer) this.turretOff += turn * s.turretRate * dt;
 
       let accel = fm.accel * slowK * thrust;
       if (this.blazerT > 0) accel = fm.accel * 1.5;   // comet: always thrusting
@@ -204,7 +218,8 @@
       this.totalShots += n;
       for (let i = 0; i < n; i++) {
         const off = n === 1 ? 0 : (i - (n - 1) / 2) * w.spread * 2.2;
-        world.spawnShot(this, this.ang + off + U.rand(-w.spread, w.spread));
+        const aim = this.spec.turret ? this.ang + this.turretOff : this.ang;
+        world.spawnShot(this, aim + off + U.rand(-w.spread, w.spread));
       }
       // Druuge recoil: every shell shoves the hull backwards
       if (w.recoil) {
@@ -470,7 +485,10 @@
 
       // SC2 sprite path: draw the real Star Control II ship art, rotated
       if (this.spec.sprite) {
-        const img = getSprite(this.spec.sprite);
+        // Mmrnmhrm X-Form: the Y shape has its own sprite (ywing-big)
+        const sprUri = (this.spec.forms && this.form === 'y' && this.spec.spriteY)
+          ? this.spec.spriteY : this.spec.sprite;
+        const img = getSprite(sprUri);
         const cloaked = this.cloakT > 0;
         if (img.complete && img.naturalWidth > 0) {
           g.save();
@@ -500,6 +518,21 @@
             const q = 12 * GM.zoomCur;
             g.strokeRect(e.x - q, e.y - q, q * 2, q * 2);
             g.globalAlpha = 1;
+          }
+        }
+        // Orz Nemesis: the howitzer turret rides on top, hull-relative,
+        // placed by its .ani anchor (6,11) at the ship's center
+        if (this.spec.turret && GM.CONTENT.shipsprites.orz_turret) {
+          const timg = getSprite(GM.CONTENT.shipsprites.orz_turret);
+          if (timg && timg.complete && timg.naturalWidth > 0) {
+            g.save();
+            g.translate(e.x, e.y);
+            g.rotate(this.ang + this.turretOff + Math.PI / 2);
+            g.imageSmoothingEnabled = false;
+            g.globalAlpha = cloaked ? 0.13 : 1;
+            g.drawImage(timg, -6 * PS, -11 * PS, timg.naturalWidth * PS, timg.naturalHeight * PS);
+            g.globalAlpha = 1;
+            g.restore();
           }
         }
         return;   // SC2 ships have no string-map art; never fall through

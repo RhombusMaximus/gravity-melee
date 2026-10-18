@@ -244,6 +244,14 @@
         if (zapped) GM.A.SND.laser();
       }
 
+      // Pkunk Fury: the original combat taunts (insult01..14.wav)
+      for (const s of this.ships) {
+        if (s.dead || s.spec.key !== 'fury') continue;
+        if (U.chance(dt * 0.09)) {
+          GM.A.playBuf('pkunk_insult' + String(1 + (Math.random() * 14 | 0)).padStart(2, '0'), 0.35);
+        }
+      }
+
       // moon body collisions
       const mp = this.moonPos();
       for (const s of this.ships) {

@@ -52,6 +52,10 @@ teams auto-fill under the same budget, so nobody fields an unfair fleet.
 | ; / ' | SFX volume down / up |
 | - / = | simulation speed ×0.25 … ×4 |
 
+Flying the Nemesis: hold **SHIFT + A/D** to swing its rotating howitzer
+turret — the shells fire along the turret, not the hull, and AI Nemesis
+pilots track you with it (the original orz.c control scheme).
+
 ## Squadron control
 
 You are **P1: the first ship of the first team** — the camera follows your
@@ -69,8 +73,13 @@ squadron from the moment the match starts, no lock-in press needed.
 
 ## Roadmap
 
-- **Online multiplayer** — next phase (WebRTC peer-to-peer or lightweight
-  relay; the sim is already deterministic-ish per fixed-step)
+- **Single-player: the full game** — hyperspace travel over a real **3D
+  starmap** (fly through the stars in perspective, in the spirit of
+  in-the-sky.org/ngc3d), solar systems with the lander minigame, the
+  Earth starbase, and dialogue with all 25 races — their comm
+  portrait animations are already sitting in the content tree
+- **Online multiplayer** (WebRTC peer-to-peer or lightweight relay; the
+  sim is already deterministic-ish per fixed-step)
 - Persistent pilot records (kills per archetype)
 
 ## HUD
@@ -147,7 +156,7 @@ and original weapon sound:
 | MY-20 Podship | 21 | artillery | homing plasma | crew regeneration |
 | YE-20 Terminator | 22 | escort | dual guns (rapid) | tactical shield |
 | UT-20 Jugger | 22 | escort | forward gat | absorber shield (no regen) |
-| OR-16 Nemesis | 23 | boarding | howitzer | marines |
+| OR-16 Nemesis | 23 | boarding | howitzer (rotating turret) | marines |
 | CH-42 Avatar | 28 | heavy cruiser | auto laser (continuous) | satellite screen |
 | CJ-36 Broodhome | 28 | dreadnought | photon crystal (AoE) | DOGI crystals |
 | KH-42 Marauder | 30 | dreadnought | F.R.I.E.D. (expanding ring) | buzzsaw blades |
@@ -199,6 +208,8 @@ And with the full roster aboard, every race fires with its own
 from each ship's directory (the Umgah's cone-zap, the Ilwrath cloaking
 field, the VUX limpet bite…). Stats come from the UQM ship sources as
 well: crew, battery, regen, Super Melee point costs and weapon damage.
+And the Pkunk Fury keeps its signature: it taunts mid-battle with the
+original 14 combat insults.
 
 **Planet graphics, melee sound effects, ship sprites, music, captain
 window animations and panel icons are Star Control II content,

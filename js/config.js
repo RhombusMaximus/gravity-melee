@@ -1,6 +1,6 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.13.0';
+  GM.VERSION = '0.14.0';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
@@ -257,6 +257,7 @@
       r: 6, mass: 1.6, accel: 110, turn: 2.8, maxSpeed: 95,
       crew: 16, batt: 20, regen: 3.5, orbit: 75,
       sprite: 'SHIP:orz', cap: 'orz', icon: 'orz',
+      turret: true, turretRate: 2.6,   // howitzer turret: hold SHIFT+A/D to swing
       weapon: { label: 'Howitzer', kind: 'shot', cd: 0.18, cost: 1.5, speed: 280, dmg: 4, size: 3, life: 1.0, count: 1, spread: 0.04, tol: 0.2, snd: 'shot' },
       special: { label: 'Marines', type: 'fighters', cost: 0, cd: 3.5, fspeed: 220, flife: 5, laserRange: 90, laserDmg: 3, laserCd: 0.8 },
     },

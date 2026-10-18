@@ -215,6 +215,13 @@
       b.jinkDir = U.randSign();
     }
 
+    // Orz Nemesis: the howitzer turret tracks the target (orz.c TrackShip)
+    if (s.spec.turret) {
+      const desired = U.angDiff(s.ang, U.ang(tw.x, tw.y));   // target angle relative to hull
+      s.turretOff += U.clamp(U.angDiff(s.turretOff, desired),
+        -s.spec.turretRate * dt, s.spec.turretRate * dt);
+    }
+
     // ---- gunnery: lead prediction, planet-aware ----
     let fire = false;
     if (dist < 270 * S && b.los) {
@@ -227,7 +234,8 @@
       }
       const aimAng = U.ang(aim.x, aim.y);
       const aimDist = U.len(aim.x, aim.y);
-      const diff = U.angDiff(s.ang, aimAng);
+      const aimRef = s.spec.turret ? s.ang + s.turretOff : s.ang;
+      const diff = U.angDiff(aimRef, aimAng);
       const tol = w.tol * (2 - arch.aim);
       const clear = !U.segCircle(s.x, s.y,
         s.x + Math.cos(aimAng) * (aimDist + 8),
