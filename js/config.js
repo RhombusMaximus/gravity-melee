@@ -260,6 +260,57 @@
       weapon: { label: 'Lightning', kind: 'bolt', cd: 0.35, cost: 2, speed: 300, dmg: 6, size: 3, life: 0.6, count: 1, spread: 0, tol: 0.14, snd: 'bolt' },
       special: { label: 'Vector Dash', type: 'afterburner', cost: 0, cd: 0, drain: 5 },
     },
+    {
+      // OR-16 Nemesis — the Orz's marine-boarding gunship. Real SC2
+      // sprite + stats from orz.c: 16 crew, 20 battery, rapid howitzer.
+      key: 'nemesis', name: 'OR-16 Nemesis', role: 'boarding', cost: 23,
+      r: 6, mass: 1.6, accel: 110, turn: 2.8, maxSpeed: 95,
+      crew: 16, batt: 20, regen: 3.5, orbit: 75,
+      sprite: 'SHIP:orz',
+      weapon: { label: 'Howitzer', kind: 'shot', cd: 0.18, cost: 1.5, speed: 280, dmg: 4, size: 3, life: 1.0, count: 1, spread: 0.04, tol: 0.2, snd: 'shot' },
+      special: { label: 'Marines', type: 'fighters', cost: 0, cd: 3.5, fspeed: 220, flife: 5, laserRange: 90, laserDmg: 3, laserCd: 0.8 },
+    },
+    {
+      // MY-20 Podship — the Mycon's slow, heavily-shielded bioship.
+      // Real SC2 sprite + stats from mycon.c: 20 crew, 40 battery,
+      // homing plasma + crew regeneration.
+      key: 'podship', name: 'MY-20 Podship', role: 'artillery', cost: 21,
+      r: 8, mass: 2.0, accel: 65, turn: 1.2, maxSpeed: 68,
+      crew: 20, batt: 40, regen: 4, orbit: 95,
+      sprite: 'SHIP:mycon',
+      weapon: { label: 'Homing Plasma', kind: 'missile', cd: 0.9, cost: 8, speed: 180, dmg: 10, size: 5, life: 3.5, count: 1, spread: 0, tol: 0.1, aoe: 25, snd: 'missile' },
+      special: { label: 'Crew Regeneration', type: 'shield', cost: 5, cd: 6, dur: 2.5 },
+    },
+    {
+      // AR-6 Skiff — the Arilou's teleporting saucer. Real SC2
+      // sprite + stats from arilou.c: 6 crew, 20 battery, rapid gun.
+      key: 'skiff', name: 'AR-6 Skiff', role: 'scout', cost: 16,
+      r: 5, mass: 0.5, accel: 160, turn: 4.0, maxSpeed: 140,
+      crew: 6, batt: 20, regen: 5, orbit: 70,
+      sprite: 'SHIP:arilou',
+      weapon: { label: 'Auto Gun', kind: 'dart', cd: 0.08, cost: 0.8, speed: 320, dmg: 2, size: 2, life: 0.6, count: 1, spread: 0.03, tol: 0.18, snd: 'laser' },
+      special: { label: 'Teleport', type: 'blink', cost: 3, cd: 1, range: 260, snd: 'blink' },
+    },
+    {
+      // SP-30 Eluder — the Spathi's famous running-away ship.
+      // Real SC2 sprite + stats from spathi.c: 30 crew, 10 battery.
+      key: 'eluder', name: 'SP-30 Eluder', role: 'skirmisher', cost: 18,
+      r: 7, mass: 1.8, accel: 130, turn: 2.0, maxSpeed: 110,
+      crew: 30, batt: 10, regen: 2, orbit: 100,
+      sprite: 'SHIP:spathi',
+      weapon: { label: 'Front Gun', kind: 'pellet', cd: 0.12, cost: 0.8, speed: 260, dmg: 3, size: 2, life: 0.7, count: 1, spread: 0.03, tol: 0.2, snd: 'pellet' },
+      special: { label: 'B.U.T.T. Missile', type: 'missile', cost: 3, cd: 1.8, speed: 220, dmg: 8, life: 3, turn: 3.0, snd: 'missile' },
+    },
+    {
+      // PK-8 Fury — the Pkunk's reincarnating interceptor.
+      // Real SC2 sprite + stats from pkunk.c: 8 crew, 12 battery.
+      key: 'fury', name: 'PK-8 Fury', role: 'interceptor', cost: 20,
+      r: 5, mass: 0.5, accel: 200, turn: 4.2, maxSpeed: 145,
+      crew: 8, batt: 12, regen: 0, orbit: 65,
+      sprite: 'SHIP:pkunk',
+      weapon: { label: 'Triple Peck', kind: 'shot', cd: 0.14, cost: 0.5, speed: 300, dmg: 2, size: 2, life: 0.5, count: 3, spread: 0.14, tol: 0.25, snd: 'shot' },
+      special: { label: 'Rebirth', type: 'shield', cost: 2, cd: 8, dur: 3.0 },
+    },
   ];
 
   // Normalize specs to world scale: distances/speeds xS, sprites render 2x.
