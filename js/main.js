@@ -83,6 +83,11 @@
       if (c === 'Digit1') enterSelect(GM.MODES[0]);
       else if (c === 'Digit2') enterSelect(GM.MODES[1]);
       else if (c === 'Digit3') enterSelect(GM.MODES[2]);
+      else if (c === 'Digit4' && GM.HYPER) {
+        GM.HYPER.init();
+        GM.state = 'hyper';
+        GM.A.startMusic('hyper');
+      }
       return;
     }
 
@@ -367,6 +372,10 @@
     let real = Math.min(0.1, (now - last) / 1000);
     last = now;
 
+    if (GM.state === 'hyper' && !GM.paused) {
+      GM.HYPER.update(Math.min(0.05, real * GM.speed));
+    }
+
     const simming = (GM.state === 'play' && !GM.paused) || GM.state === 'victory';
     if (simming) {
       GM.humanShip && (GM.humanShip.humanInput = humanInput());
@@ -401,6 +410,13 @@
     if (sh > 0.1) g.translate(U.rand(-sh, sh) | 0, U.rand(-sh, sh) | 0);
 
     // ===== WORLD LAYER (#cv, 2304x1296) =====
+    if (GM.state === 'hyper') {
+      GM.HYPER.drawWorld(g, t);
+      g.restore();
+      hg.clearRect(0, 0, GM.VW, GM.VH);
+      GM.HYPER.drawHUD(hg, t);
+      return;
+    }
     g.fillStyle = '#04060c';
     g.fillRect(-30, -30, GM.WV + 60, GM.WH + 60);
 

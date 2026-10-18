@@ -24,7 +24,8 @@ PLANETS = ['bluegas', 'purplegas', 'magma', 'organic', 'emerald',
 CYCLE = ['bluegas', 'purplegas', 'magma', 'organic', 'radioactive']
 WAVS = ['boom1', 'boom23', 'boom45', 'boom67', 'getcrew', 'shipdies']
 # SC2 music modules (ProTracker .mod, played by js/protracker.js)
-MODS = {'battle': 'battle/battle.mod', 'hyper': 'nav/hyper.mod'}
+MODS = {'battle': 'battle/battle.mod', 'hyper': 'nav/hyper.mod',
+        'orbit': 'nav/orbit.mod'}
 
 # SC2 ship sprites + weapon sounds: species -> (png, primary.wav, secondary.wav).
 # Embedded buffer keys are <species>_<wav file sans extension> so the Mmrnmhrm
@@ -82,6 +83,12 @@ EXTRA_WAVS = {
     'chenjesu': ['dogibark.wav'],
     'urquan': ['fighter_laser.wav', 'fighter_get.wav'],
     'pkunk': [f'insult{i:02d}.wav' for i in range(1, 15)],   # the famous combat taunts
+}
+
+# nav sprite sets for the hyperspace mode: key -> (dir, name, frame count)
+NAV_SETS = {
+    'flagship': ('nav', 'flagship', 16),        # the 16-facing map icon
+    'sun': ('nav', 'truespacesun', 5),          # animated system-view sun
 }
 
 # extra per-ship sprites: the Mmrnmhrm Y-Form shape + the Orz howitzer turret
@@ -159,6 +166,24 @@ def main():
         raw = git_show(repo, ref, f'{base}/ships/{sp}/{png}')
         b64 = base64.b64encode(raw).decode()
         parts.append(f"      {key}: 'data:image/png;base64,{b64}',\n")
+    parts.append('    },\n')
+    parts.append('    navsprites: {\n')
+    for key, (d, nm, count) in NAV_SETS.items():
+        ani = git_show(repo, ref, f'{base}/{d}/{nm}.ani').decode('utf-8', 'replace')
+        anchors = []
+        for ln in ani.splitlines():
+            flds = ln.split()
+            if len(flds) >= 5:
+                anchors.append((int(flds[3]), int(flds[4])))
+        n = min(count, len(anchors))
+        parts.append(f'      {key}: {{\n        f: [\n')
+        for i in range(n):
+            raw = git_show(repo, ref, f'{base}/{d}/{nm}-{i:03d}.png')
+            b64 = base64.b64encode(raw).decode()
+            parts.append(f"          'data:image/png;base64,{b64}',\n")
+        parts.append('        ],\n')
+        parts.append('        a: [' + ', '.join(f'[{ax},{ay}]' for ax, ay in anchors[:n]) + '],\n')
+        parts.append('      },\n')
     parts.append('    },\n')
     parts.append('    captains: {\n')
     for sp, name in CAPTAIN_SETS.items():

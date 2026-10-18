@@ -71,13 +71,29 @@ squadron from the moment the match starts, no lock-in press needed.
   a specific ship (your held ship, then P1, then a teammate), never a fuzzy
   center-of-mass
 
+## Campaign: hyperspace (v0.15, first slice)
+
+Press **4** on the title screen and melee gives way to the campaign
+starmap: you fly the Precursor flagship through a real **3D starfield**
+built from the official UQM star definitions — **502 systems** in their
+**102 named constellations**, color-coded by spectral class, with depth
+fog as you cruise (`A`/`D` yaw, `R`/`F` pitch, `W` thrust, `S` brake).
+Nearby systems pick up labels; fly up to one and press **ENTER** to
+drop into its orbit view — the original animated sun and SC2 planet
+discs on tilted orbits, with the real `orbit.mod` theme playing.
+`ESC` returns to hyperspace, `ESC` again to the title. You start
+near Sol.
+
+![hyperspace](https://raw.githubusercontent.com/RhombusMaximus/gravity-melee/main/docs/hyperspace.png)
+
+Next campaign steps: the lander minigame, the Earth starbase, fuel and
+minerals, dialogue with all 25 races (their comm portraits are already
+in the tree), and the war.
+
 ## Roadmap
 
-- **Single-player: the full game** — hyperspace travel over a real **3D
-  starmap** (fly through the stars in perspective, in the spirit of
-  in-the-sky.org/ngc3d), solar systems with the lander minigame, the
-  Earth starbase, and dialogue with all 25 races — their comm
-  portrait animations are already sitting in the content tree
+- **Campaign: the full single-player game** — hyperspace is live (see
+  above); remaining: lander, starbase, comm, war
 - **Online multiplayer** (WebRTC peer-to-peer or lightweight relay; the
   sim is already deterministic-ish per fixed-step)
 - Persistent pilot records (kills per archetype)

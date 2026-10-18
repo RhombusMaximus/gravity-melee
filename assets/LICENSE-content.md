@@ -3,7 +3,9 @@
 The Star Control II content embedded in `js/content.js` (same files,
 unmodified, exported into `assets/` by `tools/build_content.py`) — planet
 graphics, melee sound effects, ship sprites, ProTracker music, the
-animated captain windows, and the status panel ship icons — is:
+animated captain windows, the status panel ship icons, the hyperspace
+nav art (flagship icon + animated sun), and the official star
+definitions from tools/map/stars.map — is:
 
 **Star Control II content — © Toys for Bob — distributed via
 The Ur-Quan Masters** (https://sc2.sourceforge.net/), and licensed to the
