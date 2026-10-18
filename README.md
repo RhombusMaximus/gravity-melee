@@ -75,10 +75,18 @@ squadron from the moment the match starts, no lock-in press needed.
 
 ## HUD
 
-- **Upper left** — your ship: pilot, crew, battery, special readiness, and a
+The corner panels are the original SC2 melee status panels, rebuilt from
+the UQM source: the ship's **captain animates in a little window** as you
+fly — leaning into turns, grabbing the stick when you thrust, flinching on
+weapons and specials — and **crew shows as a column of green dots** (one
+per crew member, like the original), battery as red dots, next to the
+ship's stamp and the captain's name.
+
+- **Upper left** — your ship: original status panel (animated captain
+  window, green crew dots, red battery dots), special readiness, and a
   subtle amber warning when enemy targeting computers have a lock on you.
-- **Upper right** — your current target: pilot, ship class, hull, battery,
-  range and closing speed.
+- **Upper right** — your current target: the same status panel, plus range
+  and closing speed.
 - **World** — cyan lock brackets frame your target on screen; a colored arrow
   at the viewport edge points to it when it's off-screen.
 - **Bottom left** — full team roster (dead pilots grayed out).
@@ -162,7 +170,12 @@ And the match soundtrack is the real deal: **the original SC2 melee theme
 our own [miniprotracker](https://github.com/RhombusMaximus/miniprotracker)
 ProTracker player. `N` toggles music, `M` mutes everything.
 
-**Planet graphics and melee sound effects are Star Control II content,
+The corner status panels come straight from the original too: the
+animated captain windows and ship stamps are the actual UQM melee HUD
+art, and crew is counted out in green dots exactly like 1992.
+
+**Planet graphics, melee sound effects, ship sprites, music, captain
+window animations and panel icons are Star Control II content,
 © Toys for Bob, distributed via The Ur-Quan Masters, licensed
 CC BY-NC-SA 2.5** — see `assets/LICENSE-content.md`. Everything else in
 this repository is MIT. The game is and remains noncommercial.

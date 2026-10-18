@@ -11,6 +11,7 @@
       '#2a2d36', '#3c414e', '#565d6e', '#6e778a', '#8b95ab',
     ]);
     R.pickPlanet();
+    R.preloadCaptains();
   };
 
   // ---- Star Control II planet discs (js/content.js, CC BY-NC-SA 2.5) ----
@@ -383,31 +384,175 @@
     }
   };
 
+  // ---------- SC2 status panel: captain window + crew/battery dot gauges ----------
+  // Faithful to the original melee HUD (sc2/src/uqm/status.c + shipstat.c):
+  // crew drawn as 2x1 green blocks (RGB15 (0,0x14,0) -> #00a500) in two
+  // staggered columns growing upward from the gauge bottom, battery the same
+  // in red (RGB15 (0x14,0,0) -> #a50000); panel chrome in the original greys;
+  // and the captain window reacting to the helm: frames 1-5 turn, 6-8
+  // thrust, 9-11 weapon, 12-14 special, 0 the idle window (overlay patches
+  // are stamped at window origin minus their .ani anchor).
+  const CAPT = {};
+  const IMGC = {};
+  function mkImg(uri) {
+    if (IMGC[uri]) return IMGC[uri];
+    const img = new Image();
+    img.src = uri;
+    IMGC[uri] = img;
+    return img;
+  }
+  R.preloadCaptains = () => {
+    const C = GM.CONTENT && GM.CONTENT.captains;
+    if (!C) return;
+    for (const sp of Object.keys(C)) {
+      if (CAPT[sp]) continue;
+      const d = C[sp];
+      const e = { img: [], ax: [], ay: [], icon: null };
+      for (let i = 0; i < d.f.length; i++) {
+        e.img.push(mkImg(d.f[i]));
+        e.ax.push(d.a[i][0]);
+        e.ay.push(d.a[i][1]);
+      }
+      if (d.i) e.icon = mkImg(d.i);
+      CAPT[sp] = e;
+    }
+  };
+
+  const CREW_GREEN = '#00a500';
+  const FUEL_RED = '#a50000';
+  const LOW_FUEL = '#ffff52';
+  const PANEL_FILL = '#525252';
+  const PANEL_HI = '#848484';
+  const PANEL_LO = '#424242';
+
+  // per-ship captain animation state (frame picking mirrors CaptainsWindow)
+  const capAnim = new Map();
+  function captainPatches(s) {
+    let st = capAnim.get(s);
+    if (!st) {
+      st = { turn: 0, T: false, shots: 0, scd: 0, burn: 0, sh: 0,
+             tTurn: -9, tThrust: -9, tWeap: -9, tSpec: -9 };
+      capAnim.set(s, st);
+    }
+    const t = GM.clockT || 0;
+    const ctrl = (s.human && s.humanInput) ? s.humanInput : (s.ctrl || {});
+    const turn = (ctrl.turn || 0) < -0.05 ? -1 : (ctrl.turn || 0) > 0.05 ? 1 : 0;
+    const T = !!s.thrusting;
+    if (turn !== st.turn) { st.tTurn = t; st.turn = turn; }
+    if (T !== st.T) { st.tThrust = t; st.T = T; }
+    if (s.totalShots > st.shots) { st.tWeap = t; st.shots = s.totalShots; }
+    if (s.scd - st.scd > 0.2 || (!st.burn && s.burnActive) || (!st.sh && s.shield > 0)) st.tSpec = t;
+    st.scd = s.scd; st.burn = s.burnActive ? 1 : 0; st.sh = s.shield > 0 ? 1 : 0;
+
+    const out = [];
+    if (st.turn === -1) out.push(t - st.tTurn < 0.09 ? 4 : 5);
+    else if (st.turn === 1) out.push(t - st.tTurn < 0.09 ? 2 : 1);
+    else if (t - st.tTurn < 0.12) out.push(3);
+    if (st.T) out.push(t - st.tThrust < 0.09 ? 7 : 8);
+    else if (t - st.tThrust < 0.09) out.push(7);
+    if (t - st.tWeap < 0.12) out.push(10);
+    else if (ctrl.fire) out.push(11);
+    if (t - st.tSpec < 0.15) out.push(13);
+    else if (s.burnActive || s.shield > 0) out.push(14);
+    return out;
+  }
+
+  // two staggered columns of 2x1 blocks, bottom up (DeltaStatistics layout)
+  function drawGaugeDots(g, x, yBottom, count, max, colr) {
+    const rows = Math.max(1, Math.ceil(max / 2));
+    const H = rows * 2 + 1;
+    const top = yBottom - H;
+    g.fillStyle = '#000';
+    g.fillRect(x, top, 9, H);
+    g.fillStyle = PANEL_HI;
+    g.fillRect(x, top, 9, 1);
+    g.fillRect(x, top, 1, H);
+    g.fillStyle = PANEL_LO;
+    g.fillRect(x, top + H - 1, 9, 1);
+    g.fillRect(x + 8, top, 1, H);
+    const n = Math.max(0, Math.min(max, count));
+    g.fillStyle = colr;
+    for (let i = 0; i < n; i++) {
+      const row = i >> 1;
+      const cx = x + 2 + ((i & 1) === 0 ? 3 : 0);
+      g.fillRect(cx, yBottom - 2 - row * 2, 2, 1);
+    }
+  }
+
+  function drawStatusPanel(g, s, px, py) {
+    const spec = s.spec;
+    const cap = CAPT[spec.cap];
+    // panel body + bevels (OutlineShipStatus / ClearShipStatus greys)
+    g.fillStyle = PANEL_FILL;
+    g.fillRect(px + 1, py + 1, 62, 100);
+    g.fillStyle = '#000';
+    g.fillRect(px, py, 64, 1);
+    g.fillStyle = PANEL_LO;
+    g.fillRect(px, py + 1, 64, 1);
+    g.fillRect(px, py + 2, 63, 1);
+    g.fillRect(px, py + 2, 1, 100);
+    g.fillRect(px + 1, py + 2, 1, 100);
+    g.fillStyle = PANEL_HI;
+    g.fillRect(px + 63, py + 1, 1, 101);
+    g.fillRect(px + 62, py + 3, 1, 99);
+    // ship name, black over a light drop shadow (DrawShipNameString)
+    g.textAlign = 'center';
+    g.font = 'bold 6px monospace';
+    g.fillStyle = PANEL_HI;
+    g.fillText(spec.name, px + 32, py + 11);
+    g.fillStyle = '#000';
+    g.fillText(spec.name, px + 32, py + 10);
+    // ship icon: the original panel stamp when the lineage has one
+    if (spec.icon && cap && cap.icon && cap.icon.complete && cap.icon.naturalWidth > 0) {
+      g.imageSmoothingEnabled = false;
+      g.drawImage(cap.icon, px + 32 - (cap.icon.naturalWidth >> 1), py + 31 - (cap.icon.naturalHeight >> 1));
+    } else {
+      drawSprite(g, spec, px + 32, py + 31, 2, s.team);
+    }
+    // crew + battery dot gauges, bottom-aligned as in the original
+    drawGaugeDots(g, px + 3, py + 56, Math.ceil(s.crew), s.crewMax, CREW_GREEN);
+    drawGaugeDots(g, px + 51, py + 56, Math.ceil(s.batt), s.battMax, FUEL_RED);
+    // captain name between the gauges, CREW/BATT labels under them
+    g.font = '6px monospace';
+    g.fillStyle = '#000';
+    g.fillText(s.name, px + 32, py + 58);
+    g.fillText('CREW', px + 13, py + 63);
+    g.fillStyle = s.batt / s.battMax < 0.2 ? LOW_FUEL : '#000';
+    g.fillText('BATT', px + 50, py + 63);
+    // captain window: idle frame + input-reactive overlays (CaptainsWindow)
+    const wy = py + 68;
+    g.fillStyle = PANEL_HI;
+    g.fillRect(px + 3, wy - 1, 57, 1);
+    g.fillRect(px + 3, wy - 1, 1, 32);
+    g.fillStyle = PANEL_LO;
+    g.fillRect(px + 3, wy + 30, 57, 1);
+    g.fillRect(px + 59, wy - 1, 1, 32);
+    if (cap && cap.img[0] && cap.img[0].complete && cap.img[0].naturalWidth > 0) {
+      g.imageSmoothingEnabled = false;
+      g.drawImage(cap.img[0], px + 4, wy);
+      for (const i of captainPatches(s)) {
+        const im = cap.img[i];
+        if (!im || !im.complete || im.naturalWidth === 0) continue;
+        g.drawImage(im, px + 4 - cap.ax[i], wy - cap.ay[i]);
+      }
+    } else {
+      g.fillStyle = '#000';
+      g.fillRect(px + 4, wy, 55, 30);
+    }
+    g.textAlign = 'left';
+  }
+
   // ---------- HUD ----------
   R.drawHUD = (g, world) => {
-    const me = GM.humanShip;
-    const lockedBy = world.lockedOnMe(me);
+    if (capAnim._w !== world) { capAnim.clear(); capAnim._w = world; }
+    const held = GM.humanShip;
+    const me = (held && !held.dead) ? held : ((world.p1 && !world.p1.dead) ? world.p1 : null);
+    const lockedBy = (held && !held.dead) ? world.lockedOnMe(held) : [];
 
-    // ===== PLAYER PANEL (upper left) =====
-    if (me && !me.dead) {
-      const T = GM.TEAMS[me.team];
-      g.font = 'bold 8px monospace';
-      g.textAlign = 'left';
-      let y = 6;
-      g.fillStyle = T.P;
-      g.fillRect(8, y, 4, 4);
-      g.fillStyle = '#cfe0ff';
-      g.fillText(me.name.toUpperCase() + ' — ' + me.spec.name, 15, y + 4);
-      y += 9;
-      g.fillStyle = '#1a2030';
-      g.fillRect(8, y, 110, 4);
-      g.fillStyle = me.crew / me.crewMax > 0.35 ? T.P : '#ff5648';
-      g.fillRect(8, y, Math.round(110 * me.crew / me.crewMax), 4);
-      g.fillStyle = '#232c40';
-      g.fillRect(8, y + 5, 110, 3);
-      g.fillStyle = '#ffd85e';
-      g.fillRect(8, y + 5, Math.round(110 * me.batt / me.battMax), 3);
-      y += 12;
+    // ===== YOUR SHIP PANEL (upper left) — the original SC2 status panel =====
+    if (me) {
+      drawStatusPanel(g, me, 6, 6);
+      // special readiness + warnings under the panel
       const sp = me.spec.special;
       let ready = me.scd <= 0 && me.batt >= sp.cost;
       let why = '';
@@ -416,53 +561,40 @@
         if (airborne > 0) { ready = false; why = ' [DECK BUSY ×' + airborne + ']'; }
         else if (me.crew <= 1) { ready = false; why = ' [NO SPARE CREW]'; }
       }
+      g.font = 'bold 8px monospace';
+      g.textAlign = 'left';
       g.fillStyle = ready ? '#8ef2ff' : '#5a6478';
-      g.fillText('SP ' + sp.label + (ready ? ' [READY]' : why), 8, y + 4);
-      y += 10;
-      // target lock warning — subtle amber pulse (never fully invisible)
+      g.fillText('SP ' + sp.label + (ready ? ' [READY]' : why), 8, 120);
       if (lockedBy.length) {
         const pulse = 0.65 + 0.35 * Math.sin((GM.clockT || 0) * 5);
         g.globalAlpha = pulse;
         g.fillStyle = '#ffb04a';
-        g.fillText('⚠ LOCKED ×' + lockedBy.length, 8, y + 4);
+        g.fillText('⚠ LOCKED ×' + lockedBy.length, 8, 132);
         g.globalAlpha = 1;
+      }
+      if (!held) {
+        g.fillStyle = '#7fd4ff';
+        g.fillText('[F] take the helm', 8, GM.VH - 8);
       }
     } else {
       g.font = 'bold 8px monospace';
       g.textAlign = 'left';
       g.fillStyle = '#7fd4ff';
-      const p1 = GM.world ? GM.world.p1 : null;
-      g.fillText(p1 && !p1.dead ? 'P1 ' + p1.name.toUpperCase() + ' — [F] take the helm' : '[F] take the helm', 8, GM.VH - 8);
+      g.fillText('[F] take the helm', 8, GM.VH - 8);
     }
 
     // ===== TARGET PANEL (upper right) =====
     const tgt = GM.humanTarget;
-    if (tgt && !tgt.dead) {
-      const T = GM.TEAMS[tgt.team];
-      g.font = 'bold 8px monospace';
-      g.textAlign = 'right';
-      let y = 6;
-      g.fillStyle = T.P;
-      g.fillRect(GM.VW - 12, y, 4, 4);
-      g.fillStyle = '#cfe0ff';
-      g.fillText(tgt.name.toUpperCase() + ' — ' + tgt.spec.name, GM.VW - 15, y + 4);
-      y += 9;
-      g.fillStyle = '#1a2030';
-      g.fillRect(GM.VW - 118, y, 110, 4);
-      g.fillStyle = tgt.crew / tgt.crewMax > 0.35 ? T.P : '#ff5648';
-      g.fillRect(GM.VW - 118 + (110 - Math.round(110 * tgt.crew / tgt.crewMax)), y, Math.round(110 * tgt.crew / tgt.crewMax), 4);
-      g.fillStyle = '#232c40';
-      g.fillRect(GM.VW - 118, y + 5, 110, 3);
-      g.fillStyle = '#ffd85e';
-      g.fillRect(GM.VW - 118 + (110 - Math.round(110 * tgt.batt / tgt.battMax)), y + 5, Math.round(110 * tgt.batt / tgt.battMax), 3);
-      y += 12;
-      const me2 = GM.humanShip;
-      if (me2 && !me2.dead) {
-        const w = U.wrapDelta(me2.x, me2.y, tgt.x, tgt.y);
+    if (tgt && !tgt.dead && tgt !== me) {
+      drawStatusPanel(g, tgt, GM.VW - 70, 6);
+      if (me) {
+        const w = U.wrapDelta(me.x, me.y, tgt.x, tgt.y);
         const dist = U.len(w.x, w.y);
         const closing = -(w.x * tgt.vx + w.y * tgt.vy) / (dist || 1);
+        g.font = 'bold 8px monospace';
+        g.textAlign = 'right';
         g.fillStyle = '#8fa2c0';
-        g.fillText('RNG ' + Math.round(dist) + '  CLOSING ' + closing.toFixed(1), GM.VW - 8, y + 4);
+        g.fillText('RNG ' + Math.round(dist) + '  CLOSING ' + closing.toFixed(1), GM.VW - 8, 120);
       }
     }
 

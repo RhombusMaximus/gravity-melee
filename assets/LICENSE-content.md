@@ -1,8 +1,9 @@
 # Content license — `assets/` and `js/content.js`
 
-The planet graphics and melee sound effects embedded in `js/content.js`
-(same files, unmodified, exported into `assets/planets/` and
-`assets/sounds/` by `tools/build_content.py`) are:
+The Star Control II content embedded in `js/content.js` (same files,
+unmodified, exported into `assets/` by `tools/build_content.py`) — planet
+graphics, melee sound effects, ship sprites, ProTracker music, the
+animated captain windows, and the status panel ship icons — is:
 
 **Star Control II content — © Toys for Bob — distributed via
 The Ur-Quan Masters** (https://sc2.sourceforge.net/), and licensed to the
