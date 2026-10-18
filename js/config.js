@@ -1,6 +1,6 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.11.0';
+  GM.VERSION = '0.11.1';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
@@ -319,7 +319,7 @@
     sp.accel *= S;
     sp.maxSpeed *= S;
     sp.orbit *= S;
-    sp.r *= 3;
+    sp.r *= 2.25;   // 25% smaller than before (was 3)
     sp.weapon.speed *= S;
     sp.weapon.size *= 3;
     if (sp.weapon.aoe) sp.weapon.aoe *= S;

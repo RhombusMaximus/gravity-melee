@@ -49,7 +49,7 @@
           const s = new GM.Ship(spec, ti, pilots[pi++ % pilots.length], arch);
           // spawn: ring around planet, teams spread, slight per-ship offset
           const baseA = (ti / nTeams) * U.TAU + (i / Math.max(1, count)) * (U.TAU / nTeams) * 0.5 + U.rand(-0.06, 0.06);
-          const rr = GM.PHYS.spawnR + U.rand(-6, 10);
+          const rr = GM.PHYS.spawnR * 1.4 + U.rand(-8, 20);
           s.x = U.wrapX(P.x + Math.cos(baseA) * rr);
           s.y = U.wrapY(P.y + Math.sin(baseA) * rr);
           // tangential velocity for a near-circular orbit (all prograde)

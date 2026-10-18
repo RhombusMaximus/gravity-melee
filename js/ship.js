@@ -329,7 +329,7 @@
       if (this.dead) return;
       const T = GM.TEAMS[this.team];
       const e = U.eff(this.x, this.y);        // camera-space position
-      const PS = Math.max(2, Math.round(3 * GM.zoomCur));   // pixel scale, zoom-aware
+      const PS = Math.max(2, Math.round(2.25 * GM.zoomCur));   // pixel scale, 25% smaller (was 3)
       if (e.x < -40 || e.x > GM.WV + 40 || e.y < -40 || e.y > GM.WH + 40) return;   // culled
 
       if (this.shield > 0) {
