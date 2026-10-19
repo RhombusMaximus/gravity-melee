@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gravity Melee — the SC2 Original Soundtrack</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23050710'/%3E%3Cpath d='M5 12V4l7-1.4V11' stroke='%237fd4ff' stroke-width='1.6' fill='none'/%3E%3Ccircle cx='4.2' cy='12' r='1.7' fill='%237fd4ff'/%3E%3Ccircle cx='11.2' cy='11' r='1.7' fill='%237fd4ff'/%3E%3C/svg%3E">
+<style>
+  :root { --ink: #cfe0ff; --dim: #8fa2c0; --faint: #55688a; --hi: #7fd4ff; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #04060c; color: var(--ink);
+    font: 14px/1.45 "DejaVu Sans Mono", "Menlo", monospace;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, #2a3550 50%, transparent 51%),
+      radial-gradient(1px 1px at 70% 65%, #2a3550 50%, transparent 51%),
+      radial-gradient(1px 1px at 40% 80%, #1d2740 50%, transparent 51%),
+      radial-gradient(1px 1px at 85% 15%, #1d2740 50%, transparent 51%),
+      radial-gradient(1px 1px at 55% 45%, #1d2740 50%, transparent 51%);
+    background-size: 220px 220px;
+  }
+  a { color: var(--hi); }
+  header { text-align: center; padding: 26px 16px 6px; }
+  h1 { font-size: 20px; letter-spacing: 2px; margin: 0 0 6px; color: #fff;
+       text-shadow: 0 0 14px rgba(127, 212, 255, .45); }
+  header .sub { color: var(--dim); font-size: 12px; max-width: 640px; margin: 0 auto; }
+  header .license { color: var(--faint); }
+  header .back { display: inline-block; margin-top: 10px; font-size: 12px; }
+  #player {
+    max-width: 760px; margin: 18px auto 8px; padding: 14px 16px 10px;
+    background: rgba(10, 16, 30, .82); border: 1px solid #1b2438; border-radius: 6px;
+  }
+  #viz { width: 100%; height: 64px; display: block; background: #060a14; border: 1px solid #131c30; border-radius: 4px; }
+  #nowline { display: flex; justify-content: space-between; align-items: baseline; margin-top: 8px; gap: 10px; }
+  #nowname { font-weight: bold; font-size: 15px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #nowtitle { color: var(--faint); font-size: 11px; }
+  #nowpos { color: var(--dim); font-size: 12px; white-space: nowrap; }
+  #bar { height: 6px; background: #131c30; border-radius: 3px; margin: 8px 0 10px; cursor: pointer; }
+  #fill { height: 100%; width: 0%; background: linear-gradient(90deg, #3fc8ff, #9dff5e); border-radius: 3px; }
+  #controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  button {
+    background: #131c30; color: var(--ink); border: 1px solid #2a3450; border-radius: 4px;
+    font: inherit; font-size: 15px; padding: 5px 12px; cursor: pointer;
+  }
+  button:hover { border-color: var(--hi); color: #fff; }
+  button.on { background: #1d3350; border-color: var(--hi); color: #fff; }
+  #vol { width: 110px; accent-color: #3fc8ff; }
+  #hint { color: var(--faint); font-size: 11px; margin-left: auto; }
+  main { max-width: 760px; margin: 12px auto 60px; padding: 0 10px; }
+  h2 { font-size: 13px; letter-spacing: 2px; color: var(--dim); margin: 22px 0 6px;
+       border-bottom: 1px solid #1b2438; padding-bottom: 4px; }
+  .trk {
+    display: flex; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 4px;
+    cursor: pointer; font-size: 13px;
+  }
+  .trk:hover { background: rgba(63, 200, 255, .08); }
+  .trk.playing { background: rgba(63, 200, 255, .14); }
+  .trk .num { color: var(--faint); width: 26px; text-align: right; }
+  .trk .nm { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .trk.playing .nm { color: #fff; }
+  .trk .ti { color: var(--faint); font-size: 11px; white-space: nowrap; overflow: hidden;
+             text-overflow: ellipsis; max-width: 38%; }
+  .trk .dur { color: var(--dim); font-size: 11px; width: 46px; text-align: right; }
+  .trk .state { width: 14px; color: #9dff5e; }
+  footer { text-align: center; color: var(--faint); font-size: 11px; padding: 20px 10px 40px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>STAR CONTROL II — ORIGINAL SOUNDTRACK</h1>
+  <p class="sub">Every ProTracker module from <em>The Ur-Quan Masters</em> — melee, hyperspace,
+  quasispace, all 24 comm themes, all 26 victory ditties, and the story cutscenes —
+  rendered live in your browser by <a href="https://github.com/RhombusMaximus/miniprotracker">our own miniprotracker</a>.
+  <span class="license">Music © Toys for Bob, distributed via The Ur-Quan Masters, CC BY-NC-SA 2.5.</span></p>
+  <a class="back" href="index.html">← back to Gravity Melee</a>
+</header>
+
+<div id="player">
+  <canvas id="viz" width="720" height="64"></canvas>
+  <div id="nowline">
+    <span id="nowname">— nothing playing —</span>
+    <span id="nowtitle"></span>
+    <span id="nowpos">0:00 / 0:00</span>
+  </div>
+  <div id="bar"><div id="fill"></div></div>
+  <div id="controls">
+    <button id="prev" title="previous">⏮</button>
+    <button id="play" title="play/pause (space)">▶</button>
+    <button id="next" title="next">⏭</button>
+    <button id="loop" title="loop mode">loop: all</button>
+    <input id="vol" type="range" min="0" max="100" value="80" title="volume">
+    <span id="hint">click a track · space play/pause · ←/→ prev/next</span>
+  </div>
+</div>
+
+<main id="list"></main>
+<footer>rendered by miniprotracker · no files preloaded — each song renders on first play</footer>
+
+<script src="js/protracker.js?v=109"></script>
+<script src="js/musiclist.js?v=109"></script>
+<script>
+(function () {
+  var GROUPS = { melee: 'MELEE & SPACE', space: 'MELEE & SPACE', cutscene: 'STORY',
+                 comm: 'COMM — DIALOGUE THEMES', ships: 'VICTORY DITTIES' };
+  var ORDER = ['melee', 'space', 'cutscene', 'comm', 'ships'];
+
+  var ctx = null, gain = null, analyser = null, src = null;
+  var cur = -1, startAt = 0, loopMode = 'all', manualStop = false;
+  var cache = new Map();      // index -> {buf, dur, title}
+  var els = {};
+  ['play','next','prev','loop','vol','fill','bar','nowname','nowtitle','nowpos','viz','list']
+    .forEach(function (id) { els[id] = document.getElementById(id); });
+  var rows = [];
+
+  function fmt(s) { s = Math.max(0, Math.round(s)); return Math.floor(s/60) + ':' + ('0' + s%60).slice(-2); }
+
+  // ---- build the track list ----
+  (function build() {
+    var lastLabel = null;
+    SC2_MUSIC.forEach(function (m, i) {
+      var label = GROUPS[m.g] || m.g;
+      if (label !== lastLabel) {
+        var h = document.createElement('h2');
+        h.textContent = label;
+        els.list.appendChild(h);
+        lastLabel = label;
+      }
+      var row = document.createElement('div');
+      row.className = 'trk';
+      row.innerHTML = '<span class="num"></span><span class="state"></span>' +
+        '<span class="nm"></span><span class="ti"></span><span class="dur"></span>';
+      row.querySelector('.num').textContent = (i + 1) + '.';
+      row.querySelector('.nm').textContent = m.n;
+      row.querySelector('.ti').textContent = m.t && m.t !== m.n ? '“' + m.t + '”' : '';
+      row.addEventListener('click', function () { play(i); });
+      els.list.appendChild(row);
+      rows.push(row);
+    });
+  })();
+
+  // ---- audio plumbing ----
+  function ensureCtx() {
+    if (!ctx) {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      gain = ctx.createGain();
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = 128;
+      gain.connect(analyser);
+      analyser.connect(ctx.destination);
+      setVol();
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+  }
+  function setVol() {
+    if (gain) gain.gain.value = (els.vol.value / 100) * 0.75;
+  }
+  els.vol.addEventListener('input', setVol);
+
+  function renderTrack(i) {
+    if (cache.has(i)) return Promise.resolve(cache.get(i));
+    var m = SC2_MUSIC[i];
+    els.nowname.textContent = 'rendering — ' + m.n + '…';
+    return fetch(m.f).then(function (r) { return r.arrayBuffer(); })
+      .then(function (ab) {
+        var mod = ProTracker.parse(new Uint8Array(ab));
+        var out = ProTracker.render(mod, { sampleRate: 44100, loops: 1 });
+        var buf = ctx.createBuffer(1, out.pcm.length, out.sampleRate);
+        buf.copyToChannel(out.pcm, 0);
+        var entry = { buf: buf, dur: out.pcm.length / out.sampleRate,
+                      title: mod.title || '', loopStart: out.loopStart || 0 };
+        if (cache.size > 7) cache.delete(cache.keys().next().value);   // keep ~7 rendered
+        cache.set(i, entry);
+        return entry;
+      });
+  }
+
+  function stopSrc() {
+    if (src) { manualStop = true; try { src.stop(); } catch (e) {} src = null; }
+    rows.forEach(function (r) { r.classList.remove('playing'); r.querySelector('.state').textContent = ''; });
+  }
+
+  function play(i) {
+    if (i < 0) i = SC2_MUSIC.length - 1;
+    if (i >= SC2_MUSIC.length) {
+      if (loopMode === 'all') i = 0; else { stopPlayback(); return; }
+    }
+    ensureCtx();
+    stopSrc();
+    var row = rows[i];
+    row.classList.add('playing');
+    row.querySelector('.state').textContent = '▶';
+    renderTrack(i).then(function (t) {
+      cur = i;
+      els.nowname.textContent = SC2_MUSIC[i].n;
+      els.nowtitle.textContent = t.title ? '“' + t.title + '”' : '';
+      row.querySelector('.dur').textContent = fmt(t.dur);
+      manualStop = false;
+      src = ctx.createBufferSource();
+      src.buffer = t.buf;
+      src.connect(gain);
+      startAt = ctx.currentTime;
+      applyLoopMode(t);
+      src.onended = function () {
+        if (manualStop) return;
+        if (loopMode === 'one') { play(cur); }
+        else { play(cur + 1); }
+      };
+      src.start();
+      els.play.textContent = '⏸';
+    }).catch(function (e) {
+      els.nowname.textContent = 'render failed — ' + (e && e.message ? e.message : e);
+    });
+  }
+
+  function stopPlayback() {
+    stopSrc();
+    cur = -1;
+    els.play.textContent = '▶';
+    els.nowname.textContent = '— nothing playing —';
+    els.nowtitle.textContent = '';
+    els.nowpos.textContent = '0:00 / 0:00';
+    els.fill.style.width = '0%';
+  }
+
+  function togglePause() {
+    if (!ctx) return;
+    if (ctx.state === 'running') { ctx.suspend(); els.play.textContent = '▶'; }
+    else { ctx.resume(); if (cur >= 0) els.play.textContent = '⏸'; }
+  }
+
+  // seamless module looping: repeat the body from its true loop point
+  function applyLoopMode(t) {
+    if (!src) return;
+    if (loopMode === 'one') {
+      src.loop = true;
+      src.loopStart = t.loopStart;
+      src.loopEnd = t.dur;
+    } else {
+      src.loop = false;
+    }
+  }
+  els.play.addEventListener('click', function () {
+    if (cur < 0 && ctx === null) play(0);
+    else if (cur < 0) play(0);
+    else togglePause();
+  });
+  els.next.addEventListener('click', function () { play(cur < 0 ? 0 : cur + 1); });
+  els.prev.addEventListener('click', function () { play(cur < 0 ? 0 : cur - 1); });
+  els.loop.addEventListener('click', function () {
+    loopMode = loopMode === 'all' ? 'one' : (loopMode === 'one' ? 'off' : 'all');
+    els.loop.textContent = 'loop: ' + loopMode;
+    els.loop.className = loopMode === 'all' ? 'on' : '';
+    if (cur >= 0 && cache.has(cur)) applyLoopMode(cache.get(cur));
+  });
+  els.bar.addEventListener('click', function (e) {
+    if (cur < 0 || !cache.get(cur)) return;
+    var frac = (e.clientX - this.getBoundingClientRect().left) / this.clientWidth;
+    startAt = ctx.currentTime - cache.get(cur).dur * frac;   // visual seek (audio keeps playing)
+  });
+  window.addEventListener('keydown', function (e) {
+    if (e.code === 'Space') { e.preventDefault(); els.play.click(); }
+    else if (e.code === 'ArrowRight') els.next.click();
+    else if (e.code === 'ArrowLeft') els.prev.click();
+  });
+
+  // ---- progress + visualizer loop ----
+  var vctx = els.viz.getContext('2d');
+  var bins = new Uint8Array(64);
+  function frame() {
+    requestAnimationFrame(frame);
+    vctx.clearRect(0, 0, els.viz.width, els.viz.height);
+    if (analyser) {
+      analyser.getByteFrequencyData(bins);
+      var bw = els.viz.width / bins.length;
+      for (var i = 0; i < bins.length; i++) {
+        var h = (bins[i] / 255) * els.viz.height;
+        vctx.fillStyle = bins[i] > 160 ? '#9dff5e' : (bins[i] > 80 ? '#3fc8ff' : '#1d3f66');
+        vctx.fillRect(i * bw, els.viz.height - h, bw - 1, h);
+      }
+    }
+    if (cur >= 0 && cache.has(cur) && ctx) {
+      var t = cache.get(cur);
+      var pos = ctx.currentTime - startAt;
+      if (pos < 0) pos = 0;
+      if (src && src.loop && pos > t.dur) {
+        pos = t.loopStart + (pos - t.loopStart) % (t.dur - t.loopStart);
+      }
+      if (pos > t.dur) pos = t.dur;
+      els.nowpos.textContent = fmt(pos) + ' / ' + fmt(t.dur);
+      els.fill.style.width = (100 * pos / t.dur).toFixed(1) + '%';
+    }
+  }
+  frame();
+})();
+</script>
+</body>
+</html>

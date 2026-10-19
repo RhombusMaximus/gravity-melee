@@ -125,6 +125,7 @@
     const ctx = A.ensure();
     if (!ctx) return;
     A.musicBuffers = {};
+    A.musicLoopStart = {};
     // render hyper FIRST (title screen needs it) — start playing as soon
     // as it's ready; battle renders in the background
     const names = Object.keys(GM.CONTENT.mods);
@@ -135,10 +136,11 @@
         const bytes = new Uint8Array(raw.length);
         for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
         const mod = ProTracker.parse(bytes);
-        const { pcm, sampleRate } = ProTracker.render(mod, { sampleRate: 44100, loops: 1 });
-        const buf = ctx.createBuffer(1, pcm.length, sampleRate);
-        buf.copyToChannel(pcm, 0);
+        const out = ProTracker.render(mod, { sampleRate: 44100, loops: 1 });
+        const buf = ctx.createBuffer(1, out.pcm.length, out.sampleRate);
+        buf.copyToChannel(out.pcm, 0);
         A.musicBuffers[name] = buf;
+        A.musicLoopStart[name] = out.loopStart || 0;
         // as soon as hyper is ready, mark ready (battle continues rendering)
         if (name === 'hyper') A.musicReady = true;
       } catch (e) { /* skip this track */ }
@@ -157,6 +159,10 @@
     const src = ctx.createBufferSource();
     src.buffer = buf;
     src.loop = true;
+    if (A.musicLoopStart[track] > 0) {
+      src.loopStart = A.musicLoopStart[track];   // skip the intro on repeat
+      src.loopEnd = buf.duration;
+    }
     const g = ctx.createGain();
     g.gain.value = A.muted ? 0 : A.musicGainVal;
     src.connect(g);

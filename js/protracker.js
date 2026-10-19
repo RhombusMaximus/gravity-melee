@@ -49,6 +49,10 @@
 
   function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
 
+  // stand-in for a missing/short pattern cell — some modules in the wild
+  // reference rows or patterns that aren't in the file
+  var NO_CELL = { sample: 0, period: 0, effect: 0 };
+
   // ---------- parsing ----------
 
   var MAGICS_4 = ['M.K.', 'M!K!', 'FLT4', '4CHN', 'FEST'];
@@ -180,6 +184,11 @@
     this.sampleRate = 44100;
     this.channels = [];
     for (var c = 0; c < mod.channels; c++) this.channels.push(new Chan());
+    // loop-point detection: (orderIdx*64 + row) -> tick index of first play
+    this.visited = { 0: 0 };
+    this.tickCount = 0;
+    this.looped = false;
+    this.loopedTo = 0;
   }
 
   function Chan() {
@@ -191,6 +200,7 @@
     this.toneTarget = 0;       // 3xx target period
     this.toneSpeed = 0;
     this.slide = 0;            // Axy per-tick volume delta
+    this.volSlide = 0;         // Dxy volume slide (D00 memorizes)
     this.portaUp = 0;          // 1xx per-tick period delta (memorized)
     this.portaDown = 0;        // 2xx
     this.lastOffset = 0;       // 9xx memory
@@ -205,13 +215,31 @@
 
   Engine.prototype.tickRate = function () { return 2 * this.tempo / 5; };
 
+  // true when the sequencer just landed on an (order,row) it has already
+  // played — that landing is the module's loop point; loopedTo holds the
+  // tick index where the row FIRST played (-> loopStart for callers)
+  Engine.prototype.checkLoopPoint = function () {
+    var key = this.orderIdx * 64 + this.row;
+    if (this.visited[key] === undefined) return false;
+    this.loopedTo = this.visited[key];
+    this.looped = true;
+    return true;
+  };
+
   // advance one sequencer tick; returns false at the song wrap (loop point)
   Engine.prototype.step = function () {
     var mod = this.mod;
     var wrapped = false;
-    var row = mod.patterns[mod.orders[this.orderIdx]][this.row];
+    this.tickCount++;
+    var pat = mod.patterns[mod.orders[this.orderIdx]];
+    var row = pat ? pat[this.row] : null;
+    if (!row) return false;   // sequencer hit a missing pattern/row: stop
 
-    if (this.tick === 0) this.startRow(row);
+    if (this.tick === 0) {
+      var mk = this.orderIdx * 64 + this.row;
+      if (this.visited[mk] === undefined) this.visited[mk] = this.tickCount;
+      this.startRow(row);
+    }
 
     for (var c = 0; c < this.channels.length; c++) {
       this.runEffects(this.channels[c], row[c]);
@@ -232,15 +260,18 @@
         this.orderIdx = this.jumpTo;
         this.row = this.breakRow >= 0 ? this.breakRow : 0;
         this.jumpTo = -1; this.breakRow = -1;
+        if (this.checkLoopPoint()) wrapped = true;
       } else if (this.breakRow >= 0) {
         this.row = this.breakRow;
         this.breakRow = -1;
         this.orderIdx++;
-        if (this.orderIdx >= mod.songLength) { this.orderIdx = mod.restart; wrapped = true; }
+        if (this.orderIdx >= mod.songLength) this.orderIdx = mod.restart;
+        if (this.checkLoopPoint()) wrapped = true;
       } else if (this.row >= 64) {
         this.row = 0;
         this.orderIdx++;
-        if (this.orderIdx >= mod.songLength) { this.orderIdx = mod.restart; wrapped = true; }
+        if (this.orderIdx >= mod.songLength) this.orderIdx = mod.restart;
+        if (this.checkLoopPoint()) wrapped = true;
       }
     }
     return !wrapped;
@@ -248,8 +279,9 @@
 
   Engine.prototype.startRow = function (row) {
     var mod = this.mod;
+    if (!row) return;   // missing row: the sequencer is already stopping
     for (var c = 0; c < this.channels.length; c++) {
-      var cell = row[c];
+      var cell = row[c] || NO_CELL;
       var cmd = cell.effect >> 8, arg = cell.effect & 0xFF;
       var ch = this.channels[c];
 
@@ -306,8 +338,12 @@
           break;
         case 0xA: ch.slide = arg; break;
         case 0xB: this.jumpTo = arg; break;
-        case 0xC: this.breakRow = arg; break;
-        case 0xD: ch.vol = clamp(arg, 0, 64); break;
+        case 0xC:
+          // Cxx pattern-break row args are BCD (C40 = row 40), not hex;
+          // clamp to 63 so a malformed nibble can't run off the pattern
+          this.breakRow = Math.min(63, ((arg >> 4) * 10) + (arg & 0x0F));
+          break;
+        case 0xD: ch.volSlide = arg || ch.volSlide; break;   // Dxy volume slide, D00 memorizes
         case 0xF:
           if (arg > 0) { if (arg < 32) this.speed = arg; else this.tempo = arg; }
           break;
@@ -335,6 +371,7 @@
   };
 
   Engine.prototype.runEffects = function (ch, cell) {
+    cell = cell || NO_CELL;
     var cmd = cell.effect >> 8, arg = cell.effect & 0xFF;
 
     if (cmd === 0x1 && ch.portaUp) ch.period = clamp(ch.period - ch.portaUp, 113, 856);
@@ -348,6 +385,11 @@
       var up = arg >> 4, down = arg & 0x0F;
       if (up && !down) ch.vol = clamp(ch.vol + up, 0, 64);
       else if (down && !up) ch.vol = clamp(ch.vol - down, 0, 64);
+    }
+    if (cmd === 0xD && ch.volSlide) {
+      var dup = ch.volSlide >> 4, ddown = ch.volSlide & 0x0F;
+      if (dup && !ddown) ch.vol = clamp(ch.vol + dup, 0, 64);
+      else if (ddown && !dup) ch.vol = clamp(ch.vol - ddown, 0, 64);
     }
     if (cmd === 0x4 || cmd === 0x6) ch.vibPos = (ch.vibPos + ch.vibRate) & 63;
     if (cmd === 0x7) ch.tremPos = (ch.tremPos + ch.tremRate) & 63;
@@ -458,7 +500,10 @@
     var pcm = new Float32Array(written);
     var off = 0;
     for (var i = 0; i < chunks.length; i++) { pcm.set(chunks[i], off); off += chunks[i].length; }
-    return { pcm: pcm, sampleRate: sampleRate, duration: written / sampleRate };
+    var loopStart = eng.looped ? eng.loopedTo / eng.tickRate() : 0;
+    if (!(loopStart > 0)) loopStart = 0;
+    return { pcm: pcm, sampleRate: sampleRate, duration: written / sampleRate,
+             looped: eng.looped, loopStart: loopStart };
   }
 
   // ---------- public API ----------

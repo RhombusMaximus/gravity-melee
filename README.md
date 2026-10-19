@@ -90,6 +90,26 @@ Next campaign steps: the lander minigame, the Earth starbase, fuel and
 minerals, dialogue with all 25 races (their comm portraits are already
 in the tree), and the war.
 
+## Soundtrack — music.html
+
+Press **O** on the title screen (or open `music.html`) for the full **SC2
+original soundtrack**: all 63 ProTracker modules from The Ur-Quan Masters
+— melee, hyperspace, quasispace, truespace, orbit, the starbase and
+shipyard, Red Alert, the intro and endings, all 24 comm themes, and all
+26 ship victory ditties — rendered live in your browser by our own
+[miniprotracker](https://github.com/RhombusMaximus/miniprotracker).
+Click any track to play; `loop: one` repeats it seamlessly from its true
+loop point.
+
+Building this surfaced four real ProTracker bugs, fixed upstream in
+miniprotracker v0.2.0: pattern-break rows are BCD (`C40` = row 40, not
+64 — the hyperspace theme's breaks had been landing wrong), `Dxy` is a
+volume slide rather than set-volume, Bxx-jump loops never terminated
+(now renders end at the module's true loop point and report it), and
+missing pattern/row references crashed the sequencer. The in-game music
+gains from it too: the hyperspace theme now repeats seamlessly,
+skipping its 1.2s intro.
+
 ## Roadmap
 
 - **Campaign: the full single-player game** — hyperspace is live (see

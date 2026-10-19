@@ -88,6 +88,7 @@
         GM.state = 'hyper';
         GM.A.startMusic('hyper');
       }
+      else if (c === 'KeyO') { window.open('music.html', '_blank'); }
       return;
     }
 
