@@ -749,6 +749,9 @@
           }
           if (this.survivalDelay <= 0 && this.ships.some((s) => s.team === 1 && s.dead)) {
             this.survivalDelay = 3;   // 3-second breather between waves
+            // play the fallen enemy's victory ditty as a kill fanfare
+            const fallen = this.ships.find((s) => s.team === 1 && s.dead);
+            if (fallen && fallen.spec.key) GM.A.playCombatDitty(fallen.spec.key);
           }
         }
         if (this.survivalDelay > 0) {

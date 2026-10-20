@@ -240,6 +240,45 @@
       .catch(function () { A.SND.victory(); });
   };
 
+  // combat ditty: play a victory jingle WITHOUT stopping the battle music —
+  // used in survival mode when an enemy is destroyed mid-match. Buffers
+  // are cached per ship type so repeat kills are instant.
+  const dittyCache = {};
+  function playDittyBuffer(buf) {
+    const ctx = A.ensure();
+    if (!ctx) return;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const g = ctx.createGain();
+    g.gain.value = A.muted ? 0 : 0.65;
+    src.connect(g);
+    g.connect(A.master);
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(function () { src.start(); }).catch(function () {});
+    } else {
+      src.start();
+    }
+  }
+  A.playCombatDitty = (specKey) => {
+    const base = VICTORY_MOD[specKey];
+    if (!base || !window.ProTracker) return;
+    const key = 'ships-' + base;
+    if (dittyCache[key]) { playDittyBuffer(dittyCache[key]); return; }
+    fetch('assets/music/' + key + '.mod')
+      .then(function (r) { return r.arrayBuffer(); })
+      .then(function (ab) {
+        const mod = ProTracker.parse(new Uint8Array(ab));
+        const out = ProTracker.render(mod, { sampleRate: 44100, loops: 1 });
+        const ctx = A.ensure();
+        if (!ctx) return;
+        const buf = ctx.createBuffer(1, out.pcm.length, out.sampleRate);
+        buf.copyToChannel(out.pcm, 0);
+        dittyCache[key] = buf;
+        playDittyBuffer(buf);
+      })
+      .catch(function () {});
+  };
+
   A.SND = {
     laser:   () => { tone(880, 0.07, 'square', 0.10, 0.4); },
     pellet:  () => { tone(700, 0.05, 'square', 0.08, 0.5); },
