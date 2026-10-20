@@ -21,13 +21,82 @@
   window.addEventListener('keydown', (e) => {
     k[e.code] = true;
     if (GM.state !== 'hyper') return;
-    if (e.code === 'Enter') H.tryEnter();
+    if (e.code === 'Enter') H.activate();
+    else if (e.code === 'KeyH') { H.help = !H.help; }
     else if (e.code === 'Escape') {
       if (H.sys !== null) { H.sys = null; GM.A.startMusic('hyper'); }
       else { GM.state = 'title'; GM.A.startMusic('hyper'); }
     }
+    else if (H.help) { H.help = false; }   // any other key dismisses the card
   });
   window.addEventListener('keyup', (e) => { k[e.code] = false; });
+
+  // ---- mouse: drag to look, scroll to zoom, click to target ----
+  const stage = document.querySelector('.stage');
+  const ptr = { down: false, x: 0, y: 0, moved: 0 };
+  function inHyper() { return GM.state === 'hyper' && H.sys === null && !H.warp; }
+  function canvasPos(e) {
+    const cv = document.getElementById('cv');
+    const r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * cv.width / r.width,
+             y: (e.clientY - r.top) * cv.height / r.height };
+  }
+  stage.addEventListener('pointerdown', (e) => {
+    if (!inHyper()) return;
+    e.preventDefault();
+    H.help = false;
+    ptr.down = true; ptr.x = e.clientX; ptr.y = e.clientY; ptr.moved = 0;
+    try { stage.setPointerCapture(e.pointerId); } catch (err) {}
+    stage.style.cursor = 'grabbing';
+  });
+  stage.addEventListener('pointermove', (e) => {
+    if (!inHyper()) { H.hover = -1; return; }
+    if (ptr.down) {
+      const dx = e.clientX - ptr.x, dy = e.clientY - ptr.y;
+      ptr.x = e.clientX; ptr.y = e.clientY;
+      ptr.moved += Math.abs(dx) + Math.abs(dy);
+      // drag right -> look right (yaw down), drag down -> pitch down
+      H.ship.yaw -= dx * 0.0042;
+      H.ship.pitch = U.clamp(H.ship.pitch - dy * 0.0035, -1.3, 1.3);
+    } else {
+      const c = canvasPos(e);
+      H.hover = pickStar(c.x, c.y);
+      stage.style.cursor = H.hover >= 0 ? 'pointer' : 'grab';
+    }
+  });
+  stage.addEventListener('pointerup', (e) => {
+    if (!ptr.down) return;
+    ptr.down = false;
+    stage.style.cursor = 'grab';
+    if (!inHyper()) return;
+    if (ptr.moved < 7) {          // a click, not a drag: target the star
+      const c = canvasPos(e);
+      const i = pickStar(c.x, c.y);
+      if (i >= 0) { H.sel = i; GM.A.SND.ui(); }
+    }
+  });
+  stage.addEventListener('wheel', (e) => {
+    if (!inHyper()) return;
+    e.preventDefault();
+    H.zoom = U.clamp(H.zoom * (e.deltaY > 0 ? 1.13 : 0.885), 0.4, 2.8);
+  }, { passive: false });
+  stage.addEventListener('dblclick', (e) => {
+    if (!inHyper()) return;
+    const c = canvasPos(e);
+    const i = pickStar(c.x, c.y);
+    if (i >= 0) { H.sel = i; H.startWarp(i); }
+  });
+
+  // nearest projected star within 30 canvas px of (x,y)
+  function pickStar(x, y) {
+    let best = -1, bd = 30 * 30;
+    for (const s of H.scr) {
+      const dx = s.x - x, dy = s.y - y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bd) { bd = d2; best = s.i; }
+    }
+    return best;
+  }
 
   // ---- state ----
   H.ship = null;
@@ -36,6 +105,13 @@
   H.nearD = Infinity;
   H.sys = null;            // entered system (star index) or null
   H.t = 0;
+  H.sel = null;            // targeted star index (click / ENTER)
+  H.warp = null;           // active warp {i, sx..tz, t, dur}
+  H.hover = -1;            // star under the cursor
+  H.zoom = 1; H.zoomCur = 1;
+  H.help = true;           // show the controls card until first input
+  H.scr = [];              // projected star screen positions this frame
+  H.mm = null;             // minimap normalized coords
   H.flag = [];             // flagship icon frames (16 facings)
   H.sun = [];              // truespacesun frames (5)
   H.planetImgs = [];
@@ -79,7 +155,23 @@
     H.nearD = Infinity;
     H.sys = null;
     H.t = 0;
+    H.sel = GM.SOL_INDEX;   // you start with home targeted
+    H.warp = null;
+    H.hover = -1;
+    H.zoom = 1; H.zoomCur = 1;
+    H.help = true;
     GM.FX.init();
+    const stg = document.querySelector('.stage');
+    if (stg) stg.style.touchAction = 'none';
+    // minimap: star (x,y) normalized into the 0..1 box
+    let mnx = Infinity, mxx = -Infinity, mny = Infinity, mxy = -Infinity;
+    for (const st of GM.STARS) {
+      if (st[2] < mnx) mnx = st[2]; if (st[2] > mxx) mxx = st[2];
+      if (st[3] < mny) mny = st[3]; if (st[3] > mxy) mxy = st[3];
+    }
+    const spanX = Math.max(1, mxx - mnx), spanY = Math.max(1, mxy - mny);
+    H.mm = GM.STARS.map((st) => [(st[2] - mnx) / spanX, (st[3] - mny) / spanY]);
+    H.mmBounds = { mnx, mny, spanX, spanY };
 
     // preload nav art (flagship icon facings + the animated sun)
     const nav = GM.CONTENT && GM.CONTENT.navsprites;
@@ -118,17 +210,36 @@
 
   H.update = (dt) => {
     H.t += dt;
+    H.zoomCur += (H.zoom - H.zoomCur) * (1 - Math.pow(0.01, dt));
     if (H.sys !== null) return;   // in the orbit view nothing flies
     const s = H.ship;
 
-    const yawIn = (k['KeyA'] ? 1 : 0) + (k['KeyD'] ? -1 : 0);
-    const pitchIn = (k['KeyR'] ? 1 : 0) + (k['KeyF'] ? -1 : 0);
+    // warp: glide to the targeted system, arriving just outside it
+    if (H.warp) {
+      const w = H.warp;
+      w.t += dt;
+      const p = Math.min(1, w.t / w.dur);
+      const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;   // ease in-out
+      s.x = w.sx + (w.tx - w.sx) * e;
+      s.y = w.sy + (w.ty - w.sy) * e;
+      s.z = w.sz + (w.tz - w.sz) * e;
+      H.cam.yaw = s.yaw;
+      H.cam.pitch = s.pitch;
+      H.near = w.i;
+      H.nearD = Math.sqrt((s.x - w.tx) * (s.x - w.tx) + (s.y - w.ty) * (s.y - w.ty) + (s.z - w.tz) * (s.z - w.tz));
+      if (p >= 1) { s.spd = 0; H.warp = null; }
+      return;
+    }
+
+    const yawIn = (k['KeyA'] || k['ArrowLeft'] ? 1 : 0) + (k['KeyD'] || k['ArrowRight'] ? -1 : 0);
+    const pitchIn = (k['KeyR'] || k['ArrowUp'] ? 1 : 0) + (k['KeyF'] || k['ArrowDown'] ? -1 : 0);
     s.yaw = s.yaw + yawIn * 1.9 * dt;
     s.pitch = U.clamp(s.pitch + pitchIn * 1.25 * dt, -1.3, 1.3);
 
+    const boost = (k['ShiftLeft'] || k['ShiftRight']) ? 2.4 : 1;
     const thrust = k['KeyW'] ? 1 : 0;
     const brake = k['KeyS'] ? 1 : 0;
-    if (thrust) s.spd = Math.min(MAX_SPEED, s.spd + ACCEL * dt);
+    if (thrust) s.spd = Math.min(MAX_SPEED * boost, s.spd + ACCEL * boost * dt);
     else s.spd = Math.max(0, s.spd - 260 * dt);
     if (brake) s.spd = Math.max(0, s.spd - 3600 * dt);
     const f = fwd(s.yaw, s.pitch);
@@ -153,10 +264,38 @@
     H.nearD = Math.sqrt(bd);
   };
 
-  H.tryEnter = () => {
-    if (H.sys !== null || H.near < 0 || H.nearD > ENTER_RANGE) return;
-    H.sys = H.near;
-    GM.A.startMusic('orbit');
+  // ENTER state machine: near a system -> enter; targeted -> warp; else
+  // target the nearest system so the second ENTER always does something
+  H.activate = () => {
+    if (H.sys !== null || H.warp) return;
+    if (H.near >= 0 && H.nearD < ENTER_RANGE) {
+      H.sys = H.near;
+      GM.A.startMusic('orbit');
+      return;
+    }
+    if (H.sel === null || H.sel < 0) {
+      if (H.near >= 0) { H.sel = H.near; GM.A.SND.ui(); }
+      return;
+    }
+    const st = GM.STARS[H.sel];
+    const dx = st[2] - H.ship.x, dy = st[3] - H.ship.y, dz = st[4] - H.ship.z;
+    const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (d < ENTER_RANGE) { H.sys = H.sel; GM.A.startMusic('orbit'); return; }
+    H.startWarp(H.sel);
+  };
+
+  H.startWarp = (i) => {
+    const st = GM.STARS[i];
+    const s = H.ship;
+    // arrive 900u short of the star, coming in on the line you left on
+    const dx = st[2] - s.x, dy = st[3] - s.y, dz = st[4] - s.z;
+    const d = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+    const ax = st[2] - dx / d * 900, ay = st[3] - dy / d * 900, az = st[4] - dz / d * 900;
+    H.warp = { i, sx: s.x, sy: s.y, sz: s.z, tx: ax, ty: ay, tz: az,
+               t: 0, dur: U.clamp(d / 2600, 1.0, 6.5) };
+    s.yaw = Math.atan2(dy, dx);
+    s.pitch = Math.asin(U.clamp(dz / d, -1, 1));
+    GM.A.SND.blink();
   };
 
   // ---- rendering ----
@@ -170,9 +309,10 @@
     const r = rightv(H.cam.yaw);
     const u = upv(f, r);
     const CW = GM.WV / 2, CH = GM.WH / 2;
-    const cx0 = s.x - f[0] * CAM_BACK;
-    const cy0 = s.y - f[1] * CAM_BACK;
-    const cz0 = s.z - f[2] * CAM_BACK + CAM_UP;
+    const camB = CAM_BACK * H.zoomCur;
+    const cx0 = s.x - f[0] * camB;
+    const cy0 = s.y - f[1] * camB;
+    const cz0 = s.z - f[2] * camB + CAM_UP;
     function proj(px, py, pz) {
       const dx = px - cx0, dy = py - cy0, dz = pz - cz0;
       const cz = dx * f[0] + dy * f[1] + dz * f[2];
@@ -219,12 +359,15 @@
     }
     g.globalAlpha = 1;
 
-    // the 514 systems
+    // the 502 systems (screen positions recorded for mouse picking)
     const labels = [];
+    H.scr = [];
+    const warpK = H.warp ? Math.sin(Math.min(1, H.warp.t / H.warp.dur) * Math.PI) : 0;
     for (let i = 0; i < GM.STARS.length; i++) {
       const st = GM.STARS[i];
       const p = proj(st[2], st[3], st[4]);
       if (!p || p[0] < -60 || p[0] > GM.WV + 60 || p[1] < -60 || p[1] > GM.WH + 60) continue;
+      H.scr.push({ i, x: p[0], y: p[1] });
       const fog = U.clamp(1 - p[2] / 26000, 0.12, 1);
       const base = st[6] === 3 ? 7.5 : (st[6] === 2 ? 4.6 : 2.6);
       const rad = U.clamp(base * 900 / p[2], 1, 10);
@@ -234,9 +377,34 @@
         g.fillStyle = col;
         g.beginPath(); g.arc(p[0], p[1], rad * 2.4, 0, U.TAU); g.fill();
       }
+      // warp streaks: stars stretch outward from the vanishing point
+      if (warpK > 0.05 && p[2] > 400) {
+        g.globalAlpha = fog * 0.55 * warpK;
+        g.strokeStyle = col;
+        g.lineWidth = Math.max(1, rad * 0.8);
+        g.beginPath();
+        g.moveTo(p[0], p[1]);
+        g.lineTo(p[0] + (p[0] - CW) * 0.22 * warpK, p[1] + (p[1] - CH) * 0.22 * warpK);
+        g.stroke();
+      }
       g.globalAlpha = fog;
       g.fillStyle = col;
       g.beginPath(); g.arc(p[0], p[1], rad, 0, U.TAU); g.fill();
+      // hover / selection highlights
+      if (i === H.hover && H.hover !== H.sel) {
+        g.globalAlpha = 0.9;
+        g.strokeStyle = '#fff';
+        g.lineWidth = 1;
+        g.beginPath(); g.arc(p[0], p[1], rad + 7, 0, U.TAU); g.stroke();
+      }
+      if (i === H.sel) {
+        const bl = 0.7 + 0.3 * Math.sin(t * 5);
+        g.globalAlpha = bl;
+        g.strokeStyle = '#fff';
+        g.lineWidth = 1.5;
+        g.beginPath(); g.arc(p[0], p[1], rad + 10, 0, U.TAU); g.stroke();
+        g.beginPath(); g.arc(p[0], p[1], rad + 14, 0, U.TAU); g.stroke();
+      }
       if (p[2] < 8000) labels.push({ x: p[0], y: p[1], n: starName(st), c: col, d: p[2] });
     }
     g.globalAlpha = 1;
@@ -355,23 +523,103 @@
     g.fillText('HYPERSPACE', 8, 14);
     g.font = '8px monospace';
     g.fillStyle = '#8fa2c0';
-    g.fillText('VEL ' + Math.round(H.ship.spd) + ' U/S', 8, 26);
-    if (H.near >= 0) {
+    g.fillText('VEL ' + Math.round(H.ship.spd) + ' U/S' +
+      ((k['ShiftLeft'] || k['ShiftRight']) && H.ship.spd > 400 ? '  [BOOST]' : ''), 8, 26);
+
+    // ---- minimap (top-down radar of the whole star map) ----
+    const MW = 100, MX = GM.VW - MW - 8, MY = 8;
+    g.fillStyle = 'rgba(4,6,12,0.78)';
+    g.fillRect(MX, MY, MW, MW);
+    g.strokeStyle = '#1b2438';
+    g.strokeRect(MX, MY, MW, MW);
+    for (let i = 0; i < H.mm.length; i++) {
+      const st = GM.STARS[i];
+      g.fillStyle = COLMAP[st[5]] || '#8fa2c0';
+      g.globalAlpha = 0.55;
+      g.fillRect(MX + H.mm[i][0] * (MW - 6) + 2, MY + H.mm[i][1] * (MW - 6) + 2, 1, 1);
+    }
+    g.globalAlpha = 1;
+    // player + heading
+    const px = (H.ship.x - H.mmBounds.mnx) / H.mmBounds.spanX;
+    const py = (H.ship.y - H.mmBounds.mny) / H.mmBounds.spanY;
+    const ppx = MX + px * (MW - 6) + 2, ppy = MY + py * (MW - 6) + 2;
+    g.fillStyle = '#fff';
+    g.fillRect(ppx - 1, ppy - 1, 3, 3);
+    g.strokeStyle = '#fff';
+    g.globalAlpha = 0.6;
+    g.beginPath();
+    g.moveTo(ppx, ppy);
+    g.lineTo(ppx + Math.cos(H.ship.yaw) * 6, ppy + Math.sin(H.ship.yaw) * 6);
+    g.stroke();
+    g.globalAlpha = 1;
+    if (H.sel !== null && H.sel >= 0) {
+      const sx2 = MX + H.mm[H.sel][0] * (MW - 6) + 2;
+      const sy2 = MY + H.mm[H.sel][1] * (MW - 6) + 2;
+      g.strokeStyle = '#3fc8ff';
+      g.beginPath(); g.arc(sx2, sy2, 4, 0, U.TAU); g.stroke();
+    }
+
+    // ---- targeted-system panel (under the minimap) ----
+    if (H.sel !== null && H.sel >= 0) {
+      const st = GM.STARS[H.sel];
+      const dx = st[2] - H.ship.x, dy = st[3] - H.ship.y, dz = st[4] - H.ship.z;
+      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      const col = COLMAP[st[5]] || '#cfe0ff';
+      g.font = 'bold 8px monospace';
+      g.fillStyle = col;
+      g.fillText('TARGET: ' + starName(st).toUpperCase(), MX, MY + MW + 14);
+      g.font = '8px monospace';
+      g.fillStyle = '#8fa2c0';
+      g.fillText('CLASS ' + st[5] + ' · ' + Math.round(d) + ' U', MX, MY + MW + 24);
+      const cl = st[7] >= 0 ? GM.STAR_CLUSTERS[st[7]] : null;
+      if (cl) { g.fillStyle = '#55688a'; g.fillText('IN ' + cl.n.toUpperCase(), MX, MY + MW + 34); }
+    }
+
+    // ---- bottom-left nearest + prompt ----
+    if (H.near >= 0 && H.warp === null) {
       const st = GM.STARS[H.near];
+      g.font = '8px monospace';
+      g.textAlign = 'left';
       g.fillStyle = COLMAP[st[5]] || '#cfe0ff';
       g.fillText(starName(st).toUpperCase() + '  ' + Math.round(H.nearD) + ' U', 8, GM.VH - 10);
-      if (H.nearD < ENTER_RANGE && Math.sin(t * 4) > -0.4) {
-        g.textAlign = 'center';
-        g.font = 'bold 11px monospace';
-        g.fillStyle = '#fff';
-        g.fillText('[ENTER] ENTER SYSTEM', GM.VW / 2, GM.VH - 34);
-        g.textAlign = 'left';
-        g.font = '8px monospace';
-      }
     }
     g.textAlign = 'center';
+    g.font = 'bold 11px monospace';
+    g.fillStyle = '#fff';
+    const blink = Math.sin(t * 4) > -0.4;
+    if (H.warp) {
+      g.fillText('WARPING TO ' + starName(GM.STARS[H.warp.i]).toUpperCase() + '…', GM.VW / 2, GM.VH - 34);
+    } else if (H.near >= 0 && H.nearD < ENTER_RANGE && blink) {
+      g.fillText('[ENTER] ENTER SYSTEM', GM.VW / 2, GM.VH - 34);
+    } else if (H.sel !== null && H.sel >= 0 && blink) {
+      g.fillText('[ENTER] WARP · [DBLCLICK] TOO', GM.VW / 2, GM.VH - 34);
+    }
+    g.font = '8px monospace';
     g.fillStyle = '#55688a';
-    g.fillText('W thrust · A/D yaw · R/F pitch · S brake · ENTER visit · ESC menu', GM.VW / 2, GM.VH - 6);
+    g.fillText('DRAG look · SCROLL zoom · CLICK target · ENTER warp/visit · W/S thrust · SHIFT boost · H help', GM.VW / 2, GM.VH - 6);
+
+    // ---- help card (until first input; H toggles) ----
+    if (H.help) {
+      g.fillStyle = 'rgba(4,6,12,0.72)';
+      g.fillRect(0, 0, GM.VW, GM.VH);
+      g.textAlign = 'center';
+      g.font = 'bold 14px monospace';
+      g.fillStyle = '#fff';
+      g.fillText('HYPERSPACE', GM.VW / 2, 92);
+      g.font = '10px monospace';
+      g.fillStyle = '#8fa2c0';
+      const lines = [
+        'DRAG — look around · SCROLL — zoom out to the whole map',
+        'CLICK a star — target it · ENTER or DOUBLE-CLICK — warp there',
+        'When you arrive in range: ENTER again to enter the system',
+        'W — thrust · S — brake · SHIFT — boost · A/D or ←/→ — yaw · R/F or ↑/↓ — pitch',
+        'Top right: the radar shows the whole map — you are the white dot',
+        '',
+        'press any key or click to begin · H shows this again',
+      ];
+      lines.forEach((ln, i) => g.fillText(ln, GM.VW / 2, 120 + i * 16));
+      g.textAlign = 'left';
+    }
     g.textAlign = 'left';
   };
 })(window.GM);

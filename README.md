@@ -78,11 +78,15 @@ starmap: you fly the Precursor flagship through a real **3D starfield**
 built from the official UQM star definitions — **502 systems** in their
 **102 named constellations**, color-coded by spectral class, with depth
 fog as you cruise (`A`/`D` yaw, `R`/`F` pitch, `W` thrust, `S` brake).
-Nearby systems pick up labels; fly up to one and press **ENTER** to
-drop into its orbit view — the original animated sun and SC2 planet
-discs on tilted orbits, with the real `orbit.mod` theme playing.
-`ESC` returns to hyperspace, `ESC` again to the title. You start
-near Sol.
+**Drag** to look around, **scroll** to zoom out and see the whole
+map at once, **click** any star to target it, then **ENTER** (or
+double-click) to **warp** there — a glide through streaking starlight
+that drops you in range. ENTER again to drop into the system's orbit
+view: the original animated sun and SC2 planet discs on tilted orbits,
+with the real `orbit.mod` theme. The top-right **radar** shows every
+system at once — you're the white dot. `H` shows the controls card,
+`W`/`S` thrust/brake, `SHIFT` boosts, arrows or `A`/`D` + `R`/`F` steer,
+`ESC` backs out. You start with Sol targeted.
 
 ![hyperspace](https://raw.githubusercontent.com/RhombusMaximus/gravity-melee/main/docs/hyperspace.png)
 
