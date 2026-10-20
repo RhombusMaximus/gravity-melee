@@ -583,8 +583,18 @@
       g.fillText('[F] take the helm', 8, GM.VH - 8);
     }
 
-    // ===== TARGET PANEL (upper right) =====
-    const tgt = GM.humanTarget;
+    // ===== TARGET PANEL (upper right) — auto-shows the current enemy =====
+    let tgt = GM.humanTarget;
+    if ((!tgt || tgt.dead) && world.ships) {
+      // no manual target: auto-acquire the first living hostile so the
+      // enemy captain window + crew dots are always visible on the right
+      const meTeam = me ? me.team : 0;
+      for (const s of world.ships) {
+        if (s.dead || s.team === meTeam) continue;
+        tgt = s;
+        break;
+      }
+    }
     if (tgt && !tgt.dead && tgt !== me) {
       drawStatusPanel(g, tgt, GM.VW - 70, 6);
       if (me) {

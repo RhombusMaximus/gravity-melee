@@ -199,6 +199,47 @@
     return A.musicOn;
   };
 
+  // ship key -> victory ditty filename in assets/music/ (ships-<name>.mod)
+  const VICTORY_MOD = {
+    human: 'cruiser', urquan: 'dreadnought', marauder: 'marauder',
+    avatar: 'avatar', terminator: 'terminator', probe: 'probe',
+    nemesis: 'nemesis', podship: 'podship', skiff: 'skiff',
+    eluder: 'eluder', fury: 'fury', shofixti: 'scout',
+    androsynth: 'guardian', umgah: 'drone', vux: 'intruder',
+    syreen: 'penetrator', melnorme: 'trader', ilwrath: 'avenger',
+    thraddash: 'torch', zoqfotpik: 'stinger', supox: 'blade',
+    utwig: 'jugger', chenjesu: 'broodhome', mmrnmhrm: 'xform',
+  };
+
+  // fetch + render + play the winning ship's original SC2 victory ditty
+  A.playVictoryDitty = (specKey) => {
+    const base = VICTORY_MOD[specKey];
+    if (!base || !window.ProTracker) { A.SND.victory(); return; }
+    A.stopMusic();
+    fetch('assets/music/ships-' + base + '.mod')
+      .then(function (r) { return r.arrayBuffer(); })
+      .then(function (ab) {
+        const mod = ProTracker.parse(new Uint8Array(ab));
+        const out = ProTracker.render(mod, { sampleRate: 44100, loops: 1 });
+        const ctx = A.ensure();
+        if (!ctx) return;
+        const buf = ctx.createBuffer(1, out.pcm.length, out.sampleRate);
+        buf.copyToChannel(out.pcm, 0);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        const g = ctx.createGain();
+        g.gain.value = A.muted ? 0 : 0.65;
+        src.connect(g);
+        g.connect(A.master);
+        if (ctx.state === 'suspended') {
+          ctx.resume().then(function () { src.start(); }).catch(function () {});
+        } else {
+          src.start();
+        }
+      })
+      .catch(function () { A.SND.victory(); });
+  };
+
   A.SND = {
     laser:   () => { tone(880, 0.07, 'square', 0.10, 0.4); },
     pellet:  () => { tone(700, 0.05, 'square', 0.08, 0.5); },

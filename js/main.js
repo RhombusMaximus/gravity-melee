@@ -391,7 +391,19 @@
         if (GM.humanShip && GM.humanShip.dead) { onPlayerShipDeath(); }
         if (GM.world.winner !== null && GM.state === 'play') {
           GM.state = 'victory';
-          GM.A.SND.victory();
+          // play the winning ship's original SC2 victory ditty
+          if (GM.world.survival) {
+            // survival: the player fell — play their ship's ditty as a sting
+            const p1s = GM.world.teams[0][0];
+            if (p1s && p1s.spec.key) GM.A.playVictoryDitty(p1s.spec.key);
+            else GM.A.SND.victory();
+          } else if (GM.world.winner >= 0) {
+            const ws = GM.world.teams[GM.world.winner];
+            if (ws && ws[0] && ws[0].spec.key) GM.A.playVictoryDitty(ws[0].spec.key);
+            else GM.A.SND.victory();
+          } else {
+            GM.A.SND.victory();   // draw
+          }
           winnerJustSet = true;
           break;
         }
