@@ -81,12 +81,17 @@ fog as you cruise (`A`/`D` yaw, `R`/`F` pitch, `W` thrust, `S` brake).
 **Drag** to look around, **scroll** to zoom out and see the whole
 map at once, **click** any star to target it, then **ENTER** (or
 double-click) to **warp** there — a glide through streaking starlight
-that drops you in range. ENTER again to drop into the system's orbit
-view: the original animated sun and SC2 planet discs on tilted orbits,
-with the real `orbit.mod` theme. The top-right **radar** shows every
-system at once — you're the white dot. `H` shows the controls card,
-`W`/`S` thrust/brake, `SHIFT` boosts, arrows or `A`/`D` + `R`/`F` steer,
-`ESC` backs out. You start with Sol targeted.
+that drops you in range. The flagship is a **3D chevron** that banks
+and pitches with your camera. Manual flight is deliberate (900 u/s,
+`SHIFT` doubles it for local dashes); **warp is how you cover real
+distance** — but it costs **fuel** (distance ÷ 1500), and the campaign
+**day counter** advances every 30 seconds of hyperspace time.
+ENTER again to drop into the system's orbit view: the original
+animated sun and SC2 planet discs on tilted orbits, with the real
+`orbit.mod` theme. The top-right **radar** shows every system at
+once — scroll to zoom it, drag to pan, click stars to target them.
+`H` shows the controls card. You start with Sol targeted and a full
+tank.
 
 ![hyperspace](https://raw.githubusercontent.com/RhombusMaximus/gravity-melee/main/docs/hyperspace.png)
 

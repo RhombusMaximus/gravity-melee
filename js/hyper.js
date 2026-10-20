@@ -9,8 +9,8 @@
 
   const COLMAP = { B: '#7fb2ff', R: '#ff6a5e', G: '#7cff5e', Y: '#ffd85e', O: '#ffab3d', W: '#f4f8ff' };
   const ENTER_RANGE = 1500;
-  const MAX_SPEED = 4200;
-  const ACCEL = 2400;
+  const MAX_SPEED = 900;    // local cruise: deliberate, for approach/cluster
+  const ACCEL = 500;
 
   const FOV = 1350;          // projection focal length (world canvas px)
   const CAM_BACK = 820;      // camera distance behind the flagship
@@ -213,6 +213,9 @@
   H.zoom = 1; H.zoomCur = 1;
   H.help = true;           // show the controls card until first input
   H.scr = [];              // projected star screen positions this frame
+  H.days = 1;              // campaign day (30s of hyperspace = 1 day)
+  H.dayT = 0;              // seconds elapsed this day
+  H.fuel = 100; H.fuelMax = 100;
   H.mm = null;             // minimap normalized coords
   H.mmZoom = 1;            // minimap zoom (1 = full map, 8 = close)
   H.mmCx = 0.5; H.mmCy = 0.5;   // minimap view center (normalized)
@@ -278,6 +281,7 @@
     H.mm = GM.STARS.map((st) => [(st[2] - mnx) / spanX, (st[3] - mny) / spanY]);
     H.mmBounds = { mnx, mny, spanX, spanY };
     H.mmZoom = 1; H.mmCx = 0.5; H.mmCy = 0.5; H.mmDrag = null;
+    H.days = 1; H.dayT = 0; H.fuel = 100;
 
     // preload nav art (flagship icon facings + the animated sun)
     const nav = GM.CONTENT && GM.CONTENT.navsprites;
@@ -320,6 +324,10 @@
     if (H.sys !== null) return;   // in the orbit view nothing flies
     const s = H.ship;
 
+    // campaign clock: 30s of hyperspace = 1 game day
+    H.dayT += dt;
+    if (H.dayT >= 30) { H.dayT -= 30; H.days++; }
+
     // warp: glide to the targeted system, arriving just outside it
     if (H.warp) {
       const w = H.warp;
@@ -342,7 +350,7 @@
     s.yaw = s.yaw + yawIn * 1.9 * dt;
     s.pitch = U.clamp(s.pitch + pitchIn * 1.25 * dt, -1.3, 1.3);
 
-    const boost = (k['ShiftLeft'] || k['ShiftRight']) ? 2.4 : 1;
+    const boost = (k['ShiftLeft'] || k['ShiftRight']) ? 2.0 : 1;
     const thrust = k['KeyW'] ? 1 : 0;
     const brake = k['KeyS'] ? 1 : 0;
     if (thrust) s.spd = Math.min(MAX_SPEED * boost, s.spd + ACCEL * boost * dt);
@@ -387,6 +395,8 @@
     const dx = st[2] - H.ship.x, dy = st[3] - H.ship.y, dz = st[4] - H.ship.z;
     const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
     if (d < ENTER_RANGE) { H.sys = H.sel; GM.A.startMusic('orbit'); return; }
+    const cost = Math.ceil(d / 1500);
+    if (H.fuel < cost) return;   // not enough fuel — the warp doesn't fire
     H.startWarp(H.sel);
   };
 
@@ -401,6 +411,8 @@
                t: 0, dur: U.clamp(d / 2600, 1.0, 6.5) };
     s.yaw = Math.atan2(dy, dx);
     s.pitch = Math.asin(U.clamp(dz / d, -1, 1));
+    // warp costs fuel: distance / 1500, rounded up
+    H.fuel = Math.max(0, H.fuel - Math.ceil(d / 1500));
     GM.A.SND.blink();
   };
 
@@ -490,7 +502,7 @@
         g.lineWidth = Math.max(1, rad * 0.8);
         g.beginPath();
         g.moveTo(p[0], p[1]);
-        g.lineTo(p[0] + (p[0] - CW) * 0.22 * warpK, p[1] + (p[1] - CH) * 0.22 * warpK);
+        g.lineTo(p[0] + (p[0] - CW) * 0.32 * warpK, p[1] + (p[1] - CH) * 0.32 * warpK);
         g.stroke();
       }
       g.globalAlpha = fog;
@@ -528,23 +540,72 @@
     }
     g.globalAlpha = 1;
 
-    // the flagship: original 16-facing hyperspace icon, picking the frame
-    // from the ship's heading relative to the (lagged) camera
-    if (H.flag.length) {
-      const rel = U.angDiff(H.cam.yaw, s.yaw);
-      let fi = Math.round(-rel * 8 / Math.PI) % 16;
-      if (fi < 0) fi += 16;
-      const img = H.flag[fi];
-      if (img && img.complete && img.naturalWidth > 0) {
-        const sc = 5;
-        const w = img.naturalWidth * sc, h = img.naturalHeight * sc;
-        g.imageSmoothingEnabled = false;
-        g.drawImage(img, CW - w / 2, CH + 130 - h / 2, w, h);
-        // engine flare when thrusting
-        if (k['KeyW']) {
-          g.globalAlpha = 0.5 + 0.3 * Math.sin(t * 30);
-          g.fillStyle = '#ffca7a';
-          g.fillRect(CW - 2, CH + 130 + h / 2 - 4, 4, 3 + (Math.random() * 3 | 0));
+    // ---- the flagship: a 3D chevron projected through the camera ----
+    // Ship-local vertices (nose forward, wings back, tail slightly up):
+    //   nose(18,0,0)  left(-8,12,-2)  right(-8,-12,-2)  tail(-4,0,6)
+    // transformed by the ship's yaw/pitch, placed at the ship's world
+    // position, then projected — so it banks and pitches with the camera.
+    {
+      const r = 14;   // chevron size in world units
+      const sv = [
+        [r * 1.3, 0, 0],          // nose
+        [-r * 0.55, r * 0.85, -r * 0.15],  // left wingtip
+        [-r * 0.55, -r * 0.85, -r * 0.15], // right wingtip
+        [-r * 0.3, 0, r * 0.45],  // tail (slightly raised)
+      ];
+      const sf = fwd(s.yaw, s.pitch);
+      const srr = rightv(s.yaw);
+      const su = upv(sf, srr);
+      function shipPt(lx, ly, lz) {
+        return proj(
+          s.x + sf[0] * lx + srr[0] * ly + su[0] * lz,
+          s.y + sf[1] * lx + srr[1] * ly + su[1] * lz,
+          s.z + sf[2] * lx + srr[2] * ly + su[2] * lz);
+      }
+      const P = sv.map((v) => shipPt(v[0], v[1], v[2]));
+      if (P.every((p) => p)) {
+        // hull fill: two triangles (left hull, right hull)
+        g.fillStyle = '#155a9e';
+        g.beginPath();
+        g.moveTo(P[0][0], P[0][1]); g.lineTo(P[1][0], P[1][1]); g.lineTo(P[3][0], P[3][1]);
+        g.closePath(); g.fill();
+        g.beginPath();
+        g.moveTo(P[0][0], P[0][1]); g.lineTo(P[2][0], P[2][1]); g.lineTo(P[3][0], P[3][1]);
+        g.closePath(); g.fill();
+        // outline
+        g.strokeStyle = '#7fd4ff';
+        g.lineWidth = 1.5;
+        g.beginPath();
+        g.moveTo(P[0][0], P[0][1]);
+        g.lineTo(P[1][0], P[1][1]);
+        g.lineTo(P[3][0], P[3][1]);
+        g.lineTo(P[2][0], P[2][1]);
+        g.closePath();
+        g.stroke();
+        // nose accent
+        g.strokeStyle = '#fff';
+        g.beginPath();
+        g.moveTo(P[0][0], P[0][1]);
+        g.lineTo(P[3][0], P[3][1]);
+        g.stroke();
+        g.lineWidth = 1;
+
+        // engine glow: behind the tail, visible when thrusting
+        const thrusting = k['KeyW'] || H.warp;
+        if (thrusting) {
+          const flick = 0.4 + 0.3 * Math.sin(t * 30);
+          // position: behind the tail vertex
+          const ex = P[3][0] + (P[3][0] - P[0][0]) * 0.3;
+          const ey = P[3][1] + (P[3][1] - P[0][1]) * 0.3;
+          g.globalAlpha = flick;
+          g.fillStyle = H.warp ? '#9ff0ff' : '#ffca7a';
+          g.beginPath();
+          g.ellipse(ex, ey, 6 + Math.random() * 4, 3 + Math.random() * 2, 0, 0, U.TAU);
+          g.fill();
+          g.globalAlpha = flick * 0.5;
+          g.beginPath();
+          g.ellipse(ex, ey, 12 + Math.random() * 6, 5 + Math.random() * 3, 0, 0, U.TAU);
+          g.fill();
           g.globalAlpha = 1;
         }
       }
@@ -626,11 +687,20 @@
     }
     if (!H.ship) return;
     g.fillStyle = '#cfe0ff';
-    g.fillText('HYPERSPACE', 8, 14);
+    g.fillText('HYPERSPACE · DAY ' + H.days, 8, 14);
     g.font = '8px monospace';
     g.fillStyle = '#8fa2c0';
     g.fillText('VEL ' + Math.round(H.ship.spd) + ' U/S' +
       ((k['ShiftLeft'] || k['ShiftRight']) && H.ship.spd > 400 ? '  [BOOST]' : ''), 8, 26);
+    // fuel bar
+    const fw = 90, fx = 8, fy = 32;
+    g.fillStyle = '#232c40';
+    g.fillRect(fx, fy, fw, 4);
+    const fuelFrac = H.fuel / H.fuelMax;
+    g.fillStyle = fuelFrac > 0.3 ? '#ffd85e' : '#ff5648';
+    g.fillRect(fx, fy, Math.round(fw * fuelFrac), 4);
+    g.fillStyle = '#55688a';
+    g.fillText('FUEL ' + H.fuel, fx + fw + 6, fy + 4);
 
     // ---- minimap (top-down radar: zoomable, pannable, clickable) ----
     const MW = MM_W, MX = MM_X(), MY = MM_Y;
@@ -722,7 +792,16 @@
     } else if (H.near >= 0 && H.nearD < ENTER_RANGE && blink) {
       g.fillText('[ENTER] ENTER SYSTEM', GM.VW / 2, GM.VH - 34);
     } else if (H.sel !== null && H.sel >= 0 && blink) {
-      g.fillText('[ENTER] WARP · [DBLCLICK] TOO', GM.VW / 2, GM.VH - 34);
+      const st2 = GM.STARS[H.sel];
+      const dx2 = st2[2] - H.ship.x, dy2 = st2[3] - H.ship.y, dz2 = st2[4] - H.ship.z;
+      const d2 = Math.sqrt(dx2*dx2 + dy2*dy2 + dz2*dz2);
+      const cost = Math.ceil(d2 / 1500);
+      if (H.fuel >= cost) {
+        g.fillText('[ENTER] WARP — ' + cost + ' FUEL', GM.VW / 2, GM.VH - 34);
+      } else {
+        g.fillStyle = '#ff5648';
+        g.fillText('NEED ' + cost + ' FUEL — HAVE ' + H.fuel, GM.VW / 2, GM.VH - 34);
+      }
     }
     g.font = '8px monospace';
     g.fillStyle = '#55688a';
@@ -745,6 +824,7 @@
         'W — thrust · S — brake · SHIFT — boost · A/D or ←/→ — yaw · R/F or ↑/↓ — pitch',
         'Top right radar: scroll to zoom in, drag to pan, click stars to target',
         '  (double-click a zoomed radar resets to the full map)',
+        'Warp costs fuel (distance ÷ 1500) · the day counter advances every 30s',
         '',
         'press any key or click to begin · H shows this again',
       ];
