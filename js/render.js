@@ -191,6 +191,21 @@
     g.beginPath(); g.arc(e2.x, e2.y, M.orbitR * zs, 0, U.TAU); g.stroke();
     g.globalAlpha = 1;
 
+    // arena boundary: the circular containment field edge
+    const AP = GM.PHYS;
+    g.strokeStyle = '#2a3550';
+    g.globalAlpha = 0.35;
+    g.setLineDash([6, 8]);
+    g.beginPath(); g.arc(e2.x, e2.y, AP.arenaR * zs, 0, U.TAU); g.stroke();
+    g.setLineDash([]);
+    // soft boundary glow ring
+    g.globalAlpha = 0.08;
+    g.strokeStyle = '#3fc8ff';
+    g.lineWidth = 3;
+    g.beginPath(); g.arc(e2.x, e2.y, AP.arenaSoft * zs, 0, U.TAU); g.stroke();
+    g.lineWidth = 1;
+    g.globalAlpha = 1;
+
     // planet glow (stronger with surge)
     const surgeGlow = world.surgeMult > 1.05;
     const glowR = (P.r + 6 + Math.sin(t * 2) * 1.5 + (world.surgeMult - 1) * 4) * zs;

@@ -1,14 +1,14 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.22.0';
+  GM.VERSION = '0.23.0';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
   // speeds, weapon ranges) so duels fill the bigger world at the same pacing.
   GM.SCALE = 2.4;
 
-  GM.W = 5592;
-  GM.H = 2580;
+  GM.W = 4000;    // square arena with a circular containment field
+  GM.H = 4000;    // (the field starts at ARENA_R from the planet)
   GM.WV = 2304;   // world-view canvas: zoomed out, most of the arena visible
   GM.WH = 1296;
   GM.VW = 640;    // HUD overlay canvas (all HUD code draws in this space)
@@ -23,9 +23,11 @@
 
   GM.PHYS = {
     dt: 1 / 60,
-    // doubled: the arena and its gravity well are 2x, ships stay the same
-    // size — the camera zoom shows less at once, making it feel vast
-    planet: { x: 2796, y: 1290, r: 180, GM: 8985600, rInf: 960, knee: 780, aCap: 2496 },
+    // square arena: the planet sits dead centre, the playable disc has
+    // radius GM.W/2; the camera sees a slice of it
+    planet: { x: 2000, y: 2000, r: 180, GM: 8985600, rInf: 960, knee: 780, aCap: 2496 },
+    arenaR: 1800,          // circular boundary radius from planet center
+    arenaSoft: 1600,        // containment field kicks in at this radius
     moon:   { r: 52, GM: 506880, rInf: 400, knee: 300, aCap: 1440, orbitR: 720, omega: 0.17 },
     spawnR: 520,
     surgeAt: 170,

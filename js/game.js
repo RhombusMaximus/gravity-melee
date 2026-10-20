@@ -245,6 +245,19 @@
         if (!s.human) GM.AI.update(s, this, dt);
         else { s.humanInput = s.humanInput || {}; }
         s.update(dt, this);
+
+        // circular containment field: push ships back toward the planet
+        // when they stray past the soft boundary (grows with overshoot)
+        const AP = GM.PHYS;
+        const adx = s.x - AP.planet.x, ady = s.y - AP.planet.y;
+        const ad = U.len(adx, ady);
+        if (ad > AP.arenaSoft) {
+          const over = (ad - AP.arenaSoft) / (AP.arenaR - AP.arenaSoft);
+          const nx = -adx / ad, ny = -ady / ad;
+          const force = Math.min(over, 1.5) * 1400;
+          s.vx += nx * force * dt;
+          s.vy += ny * force * dt;
+        }
         if (s.ctrl.fire || (s.humanInput && s.humanInput.fire)) s.fire(this);
         if (!s.human && s.ctrl.special) s.useSpecial(this);
         if (s.human && s.humanInput && s.humanInput.special) s.useSpecial(this);
