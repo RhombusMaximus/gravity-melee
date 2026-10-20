@@ -4,6 +4,10 @@
   const R = { planetCv: null, moonCv: null, planetImg: null, planetFrames: null, planetKey: null };
 
   const WS_IMG = {};
+  // weapon sprites that should NOT cycle animation frames — elongated
+  // projectiles (shells, missiles) look like they're spinning when
+  // frame cycling stacks on the velocity rotation; show frame 0 only
+  const STATIC_WEAPON = { orz: true, human: true, druuge: true };
   R.preloadWeapons = () => {
     const C = GM.CONTENT && GM.CONTENT.weaponsprites;
     if (!C) return;
@@ -276,7 +280,7 @@
       if (e.x < -20 || e.x > GM.WV + 20 || e.y < -20 || e.y > GM.WH + 20) continue;
       const ws = sh.wspr && WS_IMG[sh.wspr];
       if (ws && ws.length && ws[0].complete && ws[0].naturalWidth > 0) {
-        const fi = Math.floor(t * 14) % ws.length;
+        const fi = STATIC_WEAPON[sh.wspr] ? 0 : Math.floor(t * 14) % ws.length;
         const img = ws[fi];
         if (img && img.complete && img.naturalWidth > 0) {
           const ang = Math.atan2(sh.vy, sh.vx);
