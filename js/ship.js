@@ -87,6 +87,7 @@
       this.slowT = Math.max(0, this.slowT - dt);
       this.pdT = Math.max(0, this.pdT - dt);
       this.cloakT = Math.max(0, this.cloakT - dt);
+      this.coneT = Math.max(0, (this.coneT || 0) - dt);
 
       this.thrusting = thrust > 0;
       // Orz turret doctrine (orz.c): hold SPECIAL + turn to swing the howitzer
@@ -215,6 +216,42 @@
       if (this.batt < w.cost) return;
       this.batt -= w.cost;
       this.wcd = w.cd;
+
+      // Umgah cone zap: instant hit in a cone in front of the ship —
+      // short range, area effect, no projectile (the original's
+      // "vacuum cleaner" defensive weapon)
+      if (w.kind === 'cone') {
+        this.coneT = 0.3;   // cone visual lingers briefly
+        let hits = 0;
+        for (const s2 of world.ships) {
+          if (s2.dead || s2.team === this.team || s2 === this || s2.spawnProt > 0) continue;
+          const wd = U.wrapDelta(this.x, this.y, s2.x, s2.y);
+          const d = U.len(wd.x, wd.y);
+          if (d > w.range + s2.r) continue;
+          const ang = Math.atan2(wd.y, wd.x);
+          const diff = Math.abs(U.angDiff(this.ang, ang));
+          if (diff < w.arc) {
+            s2.damage(w.dmg, this, world, 'shot');
+            this.totalHits++;
+            hits++;
+            GM.FX.emit(s2.x, s2.y, 4, { spd: 60, life: 0.3, col: '#b6ff9e', size: 1.5 });
+          }
+        }
+        // also fry enemy shots in the cone
+        for (let j = world.shots.length - 1; j >= 0; j--) {
+          const sh = world.shots[j];
+          if (sh.team === this.team) continue;
+          const wd = U.wrapDelta(this.x, this.y, sh.x, sh.y);
+          const d = U.len(wd.x, wd.y);
+          if (d > w.range) continue;
+          const ang = Math.atan2(wd.y, wd.x);
+          if (Math.abs(U.angDiff(this.ang, ang)) < w.arc) world.shots.splice(j, 1);
+        }
+        if (hits) GM.FX.addShake(1);
+        const cap = this.spec.cap;
+        if (!cap || !GM.A.playBuf(cap + '_primary', 0.5)) GM.A.SND[w.snd]();
+        return;
+      }
       const n = w.count || 1;
       this.totalShots += n;
       for (let i = 0; i < n; i++) {
@@ -500,6 +537,29 @@
 
       // SC2 sprite path: draw the real Star Control II ship art, rotated
       if (this.spec.sprite) {
+        // Androsynth blazer form: the ship becomes a fireball — skip the
+        // normal sprite and draw a radial-gradient comet instead
+        if (this.blazerT > 0) {
+          const fr = this.r * GM.zoomCur * 2.5;
+          const grd = g.createRadialGradient(e.x, e.y, 0, e.x, e.y, fr);
+          grd.addColorStop(0, 'rgba(255,255,200,0.9)');
+          grd.addColorStop(0.3, 'rgba(255,160,40,0.7)');
+          grd.addColorStop(0.6, 'rgba(255,80,20,0.35)');
+          grd.addColorStop(1, 'rgba(255,40,0,0)');
+          g.fillStyle = grd;
+          g.beginPath(); g.arc(e.x, e.y, fr, 0, U.TAU); g.fill();
+          // white-hot core
+          g.fillStyle = 'rgba(255,255,255,' + (0.6 + 0.4 * Math.sin(t * 25)) + ')';
+          g.beginPath(); g.arc(e.x, e.y, this.r * GM.zoomCur * 0.5, 0, U.TAU); g.fill();
+          // trailing flame particles
+          const back = this.ang + Math.PI;
+          for (let i = 0; i < 3; i++) {
+            const off = U.rand(-0.4, 0.4);
+            GM.FX.emit(this.x + Math.cos(back + off) * this.r, this.y + Math.sin(back + off) * this.r,
+              1, { spd: 30, life: 0.3, col: i === 0 ? '#fff' : (i === 1 ? '#ffb04a' : '#ff5648'), size: 3 });
+          }
+          return;   // no normal sprite while blazing
+        }
         // Mmrnmhrm X-Form: the Y shape has its own sprite (ywing-big)
         const sprUri = (this.spec.forms && this.form === 'y' && this.spec.spriteY)
           ? this.spec.spriteY : this.spec.sprite;
@@ -533,6 +593,23 @@
             const q = 12 * GM.zoomCur;
             g.strokeRect(e.x - q, e.y - q, q * 2, q * 2);
             g.globalAlpha = 1;
+          }
+        }
+        // Umgah cone zap: draw the cone effect in front of the ship
+        if (this.coneT > 0 && this.spec.weapon.kind === 'cone' && GM.CONTENT.weaponsprites.umgah) {
+          const cw = GM.CONTENT.weaponsprites.umgah;
+          const cfi = Math.min(cw.f.length - 1, Math.floor((1 - this.coneT / 0.3) * cw.f.length));
+          const cimg = getSprite(cw.f[cfi]);
+          if (cimg && cimg.complete && cimg.naturalWidth > 0) {
+            g.save();
+            g.translate(e.x, e.y);
+            g.rotate(this.ang + Math.PI / 2);
+            const csc = Math.max(3, Math.round(3 * GM.zoomCur));
+            g.imageSmoothingEnabled = false;
+            g.globalAlpha = this.coneT / 0.3;
+            g.drawImage(cimg, -6 * csc, -11 * csc, cimg.naturalWidth * csc, cimg.naturalHeight * csc);
+            g.globalAlpha = 1;
+            g.restore();
           }
         }
         // Orz Nemesis: the howitzer turret rides on top, hull-relative,

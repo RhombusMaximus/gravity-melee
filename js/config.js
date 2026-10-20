@@ -1,6 +1,6 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.25.0';
+  GM.VERSION = '0.26.0';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
@@ -80,7 +80,7 @@
       r: 6, mass: 0.4, accel: 120, turn: 3.0, maxSpeed: 100,
       crew: 10, batt: 30, regen: 0, orbit: 60,
       sprite: 'SHIP:umgah', cap: 'umgah', icon: 'umgah',
-      weapon: { label: 'Cone Zap', kind: 'shot', cd: 0.28, cost: 0, speed: 240, dmg: 1, size: 2, life: 0.4, count: 3, spread: 0.28, tol: 0.3, snd: 'shot' },
+      weapon: { label: 'Cone Zap', kind: 'cone', cd: 0.35, cost: 0, dmg: 2, range: 200, arc: 0.5, tol: 0.3, snd: 'shot' },
       special: { label: 'Retro-Propulsion', type: 'reverse', cost: 1, cd: 0.25, kick: 320 },
     },
     {

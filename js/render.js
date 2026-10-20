@@ -384,6 +384,23 @@
       }
     }
 
+    // point-defense laser beams (Human Cruiser): cyan lines to zapped targets
+    if (world.pdBeams) {
+      g.strokeStyle = '#ffe98a';
+      g.lineWidth = 1.5;
+      for (const b of world.pdBeams) {
+        const e1 = U.eff(b.x1, b.y1);
+        const e2 = U.eff(b.x2, b.y2);
+        g.globalAlpha = Math.min(1, b.t / 0.1);
+        g.beginPath();
+        g.moveTo(e1.x, e1.y);
+        g.lineTo(e2.x, e2.y);
+        g.stroke();
+      }
+      g.globalAlpha = 1;
+      g.lineWidth = 1;
+    }
+
     // explosion animations: original SC2 boom sprites
     if (world.explosions) {
       for (const ex of world.explosions) {

@@ -23,6 +23,7 @@
       this.ships = [];
       this.explosions = [];   // active boom animations
       this.sats = [];         // orbiting zap satellites (Chmmr Avatar)
+      this.pdBeams = [];       // point-defense laser beams (visual)
       this.fighters = [];      // Kzer-Za autonomous interceptors
       this.teams = [];
       this.survival = !!(opts && opts.survival);
@@ -288,6 +289,7 @@
           if (sh.team === s.team || sh.by === s) continue;
           const wd = U.wrapDelta(sh.x, sh.y, s.x, s.y);
           if (U.len(wd.x, wd.y) < sp.rad) {
+            this.pdBeams.push({ x1: s.x, y1: s.y, x2: sh.x, y2: sh.y, t: 0.1 });
             GM.FX.emit(sh.x, sh.y, 4, { spd: 60, life: 0.3, col: '#ffe98a', size: 1.5 });
             this.shots.splice(i, 1);
             zapped++;
@@ -297,6 +299,7 @@
           if (f.dead || f.team === s.team) continue;
           const wd = U.wrapDelta(f.x, f.y, s.x, s.y);
           if (U.len(wd.x, wd.y) < sp.rad) {
+            this.pdBeams.push({ x1: s.x, y1: s.y, x2: f.x, y2: f.y, t: 0.1 });
             f.dead = true; zapped++;
             GM.FX.emit(f.x, f.y, 8, { spd: 70, life: 0.4, col: '#ffe98a', size: 2 });
           }
@@ -729,6 +732,11 @@
             break;
           }
         }
+      }
+
+      for (let i = this.pdBeams.length - 1; i >= 0; i--) {
+        this.pdBeams[i].t -= dt;
+        if (this.pdBeams[i].t <= 0) this.pdBeams.splice(i, 1);
       }
 
       for (let i = this.explosions.length - 1; i >= 0; i--) {
