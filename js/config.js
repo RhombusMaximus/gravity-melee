@@ -1,6 +1,6 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.21.0';
+  GM.VERSION = '0.21.1';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
@@ -121,6 +121,7 @@
       weapon: { label: 'Megawatt Lance', kind: 'fusion', cd: 0.32, cost: 1, speed: 210, dmg: 3, size: 4, life: 0.75, count: 1, spread: 0, tol: 0.1, snd: 'plasma' },
       special: { label: 'Limpet Torpedoes', type: 'limpet', cost: 2, cd: 0.8, dmg: 1, rad: 14, maxMines: 8, slow: true, slowDur: 5, snd: 'mine' },
     },
+/* retired for now
     {
       // SY-12 Penetrator — the Syreen call ship (syreen.c: 12 crew, 16
       // battery, particle beam + the Psi-Mind Call that steals enemy crew).
@@ -131,6 +132,7 @@
       weapon: { label: 'Particle Beam', kind: 'bolt', cd: 0.2, cost: 1, speed: 260, dmg: 2, size: 3, life: 0.8, count: 1, spread: 0, tol: 0.16, snd: 'bolt' },
       special: { label: 'Psi-Mind Call', type: 'call', cost: 5, cd: 6, range: 210 },
     },
+    */
     {
       // AN-20 Guardian — the Androsynth brawler (androsyn.c: 20 crew, 24
       // battery, acid bubbles + the invulnerable Blazer comet form).
