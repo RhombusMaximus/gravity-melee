@@ -415,6 +415,7 @@
             const fw = U.wrapDelta(sh.x, sh.y, f.x, f.y);
             if (U.len(fw.x, fw.y) < 4 + sh.size * 0.5) {
               f.dead = true;
+              if (f.by && f.by.spec && f.by.spec.cap) GM.A.playBuf(f.by.spec.cap + '_argh', 0.5);
               GM.FX.emit(f.x, f.y, 8, { spd: 70, life: 0.4, col: '#ffd28a', size: 2 });
               GM.A.SND.hit();
               dead = true;

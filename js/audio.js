@@ -216,6 +216,8 @@
     const base = VICTORY_MOD[specKey];
     if (!base || !window.ProTracker) { A.SND.victory(); return; }
     A.stopMusic();
+    // kill any lingering combat ditty so the victory theme is clean
+    if (A.combatSrc) { try { A.combatSrc.stop(); } catch (e) {} A.combatSrc = null; }
     fetch('assets/music/ships-' + base + '.mod')
       .then(function (r) { return r.arrayBuffer(); })
       .then(function (ab) {
@@ -244,15 +246,19 @@
   // used in survival mode when an enemy is destroyed mid-match. Buffers
   // are cached per ship type so repeat kills are instant.
   const dittyCache = {};
+  A.combatSrc = null;   // active combat ditty source (stopped by victory ditty)
   function playDittyBuffer(buf) {
     const ctx = A.ensure();
     if (!ctx) return;
+    // stop any previous combat ditty so they don't stack
+    if (A.combatSrc) { try { A.combatSrc.stop(); } catch (e) {} A.combatSrc = null; }
     const src = ctx.createBufferSource();
     src.buffer = buf;
     const g = ctx.createGain();
     g.gain.value = A.muted ? 0 : 0.65;
     src.connect(g);
     g.connect(A.master);
+    A.combatSrc = src;
     if (ctx.state === 'suspended') {
       ctx.resume().then(function () { src.start(); }).catch(function () {});
     } else {

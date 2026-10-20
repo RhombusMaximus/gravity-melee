@@ -83,7 +83,8 @@ EXTRA_WAVS = {
     'utwig': ['shieldbattgain.wav'],
     'chenjesu': ['dogibark.wav'],
     'urquan': ['fighter_laser.wav', 'fighter_get.wav'],
-    'pkunk': [f'insult{i:02d}.wav' for i in range(1, 15)] + ['rebirth.wav'],   # the famous combat taunts
+    'pkunk': [f'insult{i:02d}.wav' for i in range(1, 15)] + ['rebirth.wav'],
+    'orz': ['argh.wav', 'zap.wav'] + ['argh.wav'],   # argh duplicated to also play on fighter death   # the famous combat taunts
 }
 
 # nav sprite sets for the hyperspace mode: key -> (dir, name, frame count)

@@ -448,7 +448,12 @@
               tgt: null, beamT: 0, dead: false,
             });
           }
-          GM.A.SND.missile();
+          // the species' original launch sound: orz secondary = "Go!",
+          // urquan secondary = fighter launch whoosh
+          if (!GM.A.playBuf(this.spec.cap + '_secondary', 0.7)) GM.A.SND.missile();
+          if (this.spec.cap === 'orz') {
+            GM.FX.float(this.x, this.y - 16, 'GO! GO!', '#7cff5e');
+          }
           GM.FX.emit(this.x, this.y, 10, { spd: 90, life: 0.4, col: GM.TEAMS[this.team].glow, size: 2 });
           break;
         }
