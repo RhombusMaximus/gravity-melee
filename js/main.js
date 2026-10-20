@@ -89,7 +89,7 @@
         GM.state = 'hyper';
         GM.A.startMusic('hyper');
       }
-      else if (c === 'KeyO') { window.open('music.html', '_blank'); }
+      else if (c === 'KeyO') { window.location.href = 'music.html'; }
       return;
     }
 
