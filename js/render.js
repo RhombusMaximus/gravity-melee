@@ -7,7 +7,7 @@
   // weapon sprites that should NOT cycle animation frames — elongated
   // projectiles (shells, missiles) look like they're spinning when
   // frame cycling stacks on the velocity rotation; show frame 0 only
-  const STATIC_WEAPON = { orz: true, human: true, druuge: true };
+  const STATIC_WEAPON = { orz: true, human: true, druuge: true, urquan: true };
   R.preloadWeapons = () => {
     const C = GM.CONTENT && GM.CONTENT.weaponsprites;
     if (!C) return;
