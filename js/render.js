@@ -3,7 +3,20 @@
   const { U } = GM;
   const R = { planetCv: null, moonCv: null, planetImg: null, planetFrames: null, planetKey: null };
 
+  const WS_IMG = {};
+  R.preloadWeapons = () => {
+    const C = GM.CONTENT && GM.CONTENT.weaponsprites;
+    if (!C) return;
+    for (const sp of Object.keys(C)) {
+      if (WS_IMG[sp]) continue;
+      WS_IMG[sp] = C[sp].f.map((uri) => { const i = new Image(); i.src = uri; return i; });
+    }
+    if (GM.CONTENT.boomsprites && !R.boomImgs) {
+      R.boomImgs = GM.CONTENT.boomsprites.f.map((uri) => { const i = new Image(); i.src = uri; return i; });
+    }
+  };
   R.init = () => {
+    R.preloadWeapons();
     R.planetCv = bakePlanet(GM.PHYS.planet.r, [
       '#3d2418', '#5a3a26', '#7a4a30', '#96653d', '#b07a48', '#c9975e',
     ]);
@@ -236,10 +249,28 @@
       }
     }
 
-    // shots
+    // shots: original SC2 weapon sprites where available
     for (const sh of world.shots) {
       const e = U.eff(sh.x, sh.y);
-      if (e.x < -8 || e.x > GM.WV + 8 || e.y < -8 || e.y > GM.WH + 8) continue;
+      if (e.x < -20 || e.x > GM.WV + 20 || e.y < -20 || e.y > GM.WH + 20) continue;
+      const ws = sh.wspr && WS_IMG[sh.wspr];
+      if (ws && ws.length && ws[0].complete && ws[0].naturalWidth > 0) {
+        const fi = Math.floor(t * 14) % ws.length;
+        const img = ws[fi];
+        if (img && img.complete && img.naturalWidth > 0) {
+          const ang = Math.atan2(sh.vy, sh.vx);
+          const psc = Math.max(2, Math.round(2.25 * zs));
+          const sw = img.naturalWidth * psc;
+          const shh = img.naturalHeight * psc;
+          g.save();
+          g.translate(e.x, e.y);
+          g.rotate(ang + Math.PI / 2);
+          g.imageSmoothingEnabled = false;
+          g.drawImage(img, -sw / 2, -shh / 2, sw, shh);
+          g.restore();
+          continue;
+        }
+      }
       const sp = U.norm(sh.vx, sh.vy);
       const sz = sh.size * zs;
       const tl = Math.min(4, sh.size + 2) * zs;
@@ -298,6 +329,24 @@
         g.fillRect(-0.5 * fz, 3 * fz, 1 * fz, 1.5 * fz);
       }
       g.restore();
+    }
+
+    // explosion animations: original SC2 boom sprites
+    if (R.boomImgs && world.explosions) {
+      for (const ex of world.explosions) {
+        const e = U.eff(ex.x, ex.y);
+        const n = R.boomImgs.length;
+        const fi = Math.min(n - 1, Math.floor(ex.t / ex.dur * n));
+        const img = R.boomImgs[fi];
+        if (img && img.complete && img.naturalWidth > 0) {
+          const sz = (ex.big ? 90 : 45) * zs;
+          const alpha = U.clamp(1 - ex.t / ex.dur, 0, 1);
+          g.globalAlpha = alpha;
+          g.imageSmoothingEnabled = false;
+          g.drawImage(img, e.x - sz / 2, e.y - sz / 2, sz, sz);
+          g.globalAlpha = 1;
+        }
+      }
     }
 
     // ships

@@ -98,6 +98,35 @@ EXTRA_SPRITES = {
     'orz_turret': ('orz', 'turret-big-000.png'),
 }
 
+# weapon projectile sprites: species -> (dir, weapon_prefix, max_frames)
+# — the original SC2 projectile art for each ship's primary weapon,
+# animated through up to `max_frames` frames
+WEAPON_SPRITES = {
+    'shofixti':  ('shofixti',  'destruct', 8),   # glory device blast
+    'zoqfotpik': ('zoqfotpik', 'spit',     8),   # anti-matter sting
+    'umgah':     ('umgah',     'cone',     6),   # cone zap
+    'ilwrath':   ('ilwrath',   'fire',     8),  # twin fusion spray
+    'thraddash': ('thraddash', 'napalm',   8),  # flame gun
+    'human':     ('human',     'saturn',   6),  # MX missile
+    'vux':       ('vux',       'limpets',  4),  # limpet torpedo
+    'androsynth':('androsynth','bubble',    3),  # acid bubble
+    'supox':     ('supox',     'glob',     6),  # glob projectile
+    'druuge':    ('druuge',    'cannon',    8),  # heavy shell
+    'spathi':    ('spathi',    'butt',      8),  # B.U.T.T. missile
+    'pkunk':     ('pkunk',     'bug',       1),  # peck projectile
+    'mycon':     ('mycon',     'plasma',    6),  # homing plasma
+    'yehat':     ('yehat',     'missile',   8),  # dual gun shot
+    'utwig':     ('utwig',     'lance',     8),  # gatling lance
+    'orz':       ('orz',       'howitzer',  8),  # howitzer shell
+    'chenjesu':  ('chenjesu',  'spark',    8),  # photon crystal
+    'kohrah':    ('kohrah',    'gas',       8),  # F.R.I.E.D.
+    'urquan':    ('urquan',    'fusion',    8),  # fusion bolt
+    'melnorme':  ('melnorme',  'pumpup',    6),  # charged orb
+}
+
+# melee explosion animation frames (battle/boom-big-000..003.png)
+BOOM_SPRITES = 4
+
 # The full UQM tracker soundtrack, played by our own miniprotracker
 # (js/protracker.js) on the standalone music.html jukebox page.
 # (group, path under content/base, display name) — exported raw to
@@ -256,6 +285,36 @@ def main():
         parts.append('        a: [' + ', '.join(f'[{ax},{ay}]' for ax, ay in anchors[:n]) + '],\n')
         parts.append('      },\n')
     parts.append('    },\n')
+    parts.append('    weaponsprites: {\n')
+    for sp, (d, wprefix, count) in WEAPON_SPRITES.items():
+        try:
+            ani = git_show(repo, ref, f'{base}/ships/{d}/{wprefix}-big.ani').decode('utf-8', 'replace')
+        except SystemExit:
+            ani = ''
+        anchors = []
+        for ln in ani.splitlines():
+            flds = ln.split()
+            if len(flds) >= 5:
+                anchors.append((int(flds[3]), int(flds[4])))
+        n = min(count, len(anchors)) if anchors else 1
+        parts.append(f'      {sp}: {{\n        f: [\n')
+        for i in range(n):
+            raw = git_show(repo, ref, f'{base}/ships/{d}/{wprefix}-big-{i:03d}.png')
+            b64 = base64.b64encode(raw).decode()
+            parts.append(f"          'data:image/png;base64,{b64}',\n")
+        parts.append('        ],\n')
+        if anchors:
+            parts.append('        a: [' + ', '.join(f'[{ax},{ay}]' for ax, ay in anchors[:n]) + '],\n')
+        else:
+            parts.append('        a: [[0,0]],\n')
+        parts.append('      },\n')
+    parts.append('    },\n')
+    parts.append('    boomsprites: {\n      f: [\n')
+    for i in range(BOOM_SPRITES):
+        raw = git_show(repo, ref, f'{base}/battle/boom-big-{i:03d}.png')
+        b64 = base64.b64encode(raw).decode()
+        parts.append(f"          'data:image/png;base64,{b64}',\n")
+    parts.append('      ],\n    },\n')
     parts.append('    captains: {\n')
     for sp, name in CAPTAIN_SETS.items():
         ani = git_show(repo, ref, f'{base}/ships/{sp}/{name}-cap.ani').decode('utf-8', 'replace')

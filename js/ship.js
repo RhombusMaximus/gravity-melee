@@ -428,6 +428,7 @@
         GM.FX.addFlash(0.28);
       }
       GM.A.SND.dies();
+      world.explosions.push({ x: this.x, y: this.y, t: 0, dur: 0.5, big: true });
       GM.FX.emit(this.x, this.y, 34, { spd: 120 * S, life: 1.0, col: '#ffd28a', size: 2.5 });
       GM.FX.emit(this.x, this.y, 18, { spd: 60 * S, life: 0.8, col: '#ff7a4a', size: 2 });
       GM.FX.emit(this.x, this.y, 12, { spd: 200 * S, life: 0.5, col: '#fff', size: 1.5 });

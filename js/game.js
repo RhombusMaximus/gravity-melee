@@ -21,6 +21,7 @@
       this.surged = false;
       this.winner = null;      // null = ongoing, -1 = draw, else team idx
       this.ships = [];
+      this.explosions = [];   // active boom animations
       this.fighters = [];      // Kzer-Za autonomous interceptors
       this.teams = [];
       this.survival = !!(opts && opts.survival);
@@ -144,7 +145,7 @@
         vx: ship.vx * 0.35 + Math.cos(ang) * w.speed,
         vy: ship.vy * 0.35 + Math.sin(ang) * w.speed,
         life: w.life, team: ship.team, dmg: w.dmg, size: w.size,
-        kind: w.kind, aoe: w.aoe || 0, by: ship,
+        kind: w.kind, aoe: w.aoe || 0, by: ship, wspr: ship.spec.cap,
         col: SHOT_COL[w.kind] || '#fff',
         grav: SHOT_GRAV[w.kind] !== undefined ? SHOT_GRAV[w.kind] : 0.3,
         turn: w.turn || 0, tgt: null, retgtT: 0,
@@ -195,6 +196,7 @@
 
     explode(x, y, dmg, rad, by, kind) {
       GM.A.SND.boom(dmg);
+      this.explosions.push({ x, y, t: 0, dur: 0.35, big: false });
       GM.FX.addShake(4);
       GM.FX.addFlash(0.08);
       GM.FX.emit(x, y, 20, { spd: 130, life: 0.6, col: '#ffd28a', size: 2 });
@@ -642,6 +644,11 @@
             }
           }
         }
+      }
+
+      for (let i = this.explosions.length - 1; i >= 0; i--) {
+        this.explosions[i].t += dt;
+        if (this.explosions[i].t >= this.explosions[i].dur) this.explosions.splice(i, 1);
       }
 
       GM.FX.update(dt);
