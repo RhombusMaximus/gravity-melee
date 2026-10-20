@@ -47,7 +47,12 @@
     H.help = false;
     ptr.down = true; ptr.x = e.clientX; ptr.y = e.clientY; ptr.moved = 0;
     try { stage.setPointerCapture(e.pointerId); } catch (err) {}
-    stage.style.cursor = 'grabbing';
+    if (overMinimap(e.clientX, e.clientY)) {
+      H.mmDrag = { cx: H.mmCx, cy: H.mmCy, x: e.clientX, y: e.clientY };
+      stage.style.cursor = 'move';
+    } else {
+      stage.style.cursor = 'grabbing';
+    }
   });
   stage.addEventListener('pointermove', (e) => {
     if (!inHyper()) { H.hover = -1; return; }
@@ -55,33 +60,83 @@
       const dx = e.clientX - ptr.x, dy = e.clientY - ptr.y;
       ptr.x = e.clientX; ptr.y = e.clientY;
       ptr.moved += Math.abs(dx) + Math.abs(dy);
-      // drag right -> look right (yaw down), drag down -> pitch down
-      H.ship.yaw -= dx * 0.0042;
-      H.ship.pitch = U.clamp(H.ship.pitch - dy * 0.0035, -1.3, 1.3);
+      if (H.mmDrag) {
+        // pan the minimap view
+        const hud = document.getElementById('hud');
+        const hr = hud.getBoundingClientRect();
+        const scaleX = (MM_W - MM_PAD * 2) / hr.width / H.mmZoom;
+        const scaleY = (MM_W - MM_PAD * 2) / hr.height / H.mmZoom;
+        H.mmCx = H.mmDrag.cx - dx * scaleX;
+        H.mmCy = H.mmDrag.cy - dy * scaleY;
+        mmClamp();
+        stage.style.cursor = 'move';
+      } else {
+        // drag right -> look right (yaw down), drag down -> pitch down
+        H.ship.yaw -= dx * 0.0042;
+        H.ship.pitch = U.clamp(H.ship.pitch - dy * 0.0035, -1.3, 1.3);
+      }
     } else {
-      const c = canvasPos(e);
-      H.hover = pickStar(c.x, c.y);
-      stage.style.cursor = H.hover >= 0 ? 'pointer' : 'grab';
+      if (overMinimap(e.clientX, e.clientY)) {
+        const i = pickMinimap(e.clientX, e.clientY);
+        H.hover = i >= 0 ? i : -1;
+        stage.style.cursor = i >= 0 ? 'pointer' : 'crosshair';
+      } else {
+        const c = canvasPos(e);
+        H.hover = pickStar(c.x, c.y);
+        stage.style.cursor = H.hover >= 0 ? 'pointer' : 'grab';
+      }
     }
   });
   stage.addEventListener('pointerup', (e) => {
     if (!ptr.down) return;
+    const wasMM = !!H.mmDrag;
+    H.mmDrag = null;
     ptr.down = false;
     stage.style.cursor = 'grab';
     if (!inHyper()) return;
-    if (ptr.moved < 7) {          // a click, not a drag: target the star
-      const c = canvasPos(e);
-      const i = pickStar(c.x, c.y);
-      if (i >= 0) { H.sel = i; GM.A.SND.ui(); }
+    if (ptr.moved < 7) {          // a click, not a drag
+      if (wasMM) {
+        // click on the minimap: target the star under the cursor
+        const i = pickMinimap(e.clientX, e.clientY);
+        if (i >= 0) { H.sel = i; GM.A.SND.ui(); }
+      } else {
+        const c = canvasPos(e);
+        const i = pickStar(c.x, c.y);
+        if (i >= 0) { H.sel = i; GM.A.SND.ui(); }
+      }
     }
   });
   stage.addEventListener('wheel', (e) => {
     if (!inHyper()) return;
     e.preventDefault();
-    H.zoom = U.clamp(H.zoom * (e.deltaY > 0 ? 1.13 : 0.885), 0.4, 2.8);
+    if (overMinimap(e.clientX, e.clientY)) {
+      // zoom the minimap, keeping the cursor's map position fixed
+      const hud = document.getElementById('hud');
+      const hr = hud.getBoundingClientRect();
+      const hx = (e.clientX - hr.left) * GM.VW / hr.width;
+      const hy = (e.clientY - hr.top) * GM.VH / hr.height;
+      const nx = U.clamp((hx - MM_X() - MM_PAD) / (MM_W - MM_PAD * 2), 0, 1);
+      const ny = U.clamp((hy - MM_Y - MM_PAD) / (MM_W - MM_PAD * 2), 0, 1);
+      const mapNx = H.mmCx + (nx - 0.5) / H.mmZoom;
+      const mapNy = H.mmCy + (ny - 0.5) / H.mmZoom;
+      H.mmZoom = U.clamp(H.mmZoom * (e.deltaY > 0 ? 0.78 : 1.28), 1, 12);
+      // re-center so the cursor's star stays under the cursor
+      H.mmCx = mapNx - (nx - 0.5) / H.mmZoom;
+      H.mmCy = mapNy - (ny - 0.5) / H.mmZoom;
+      mmClamp();
+    } else {
+      H.zoom = U.clamp(H.zoom * (e.deltaY > 0 ? 1.13 : 0.885), 0.4, 2.8);
+    }
   }, { passive: false });
   stage.addEventListener('dblclick', (e) => {
     if (!inHyper()) return;
+    if (overMinimap(e.clientX, e.clientY)) {
+      // dblclick on minimap: if zoomed, reset; if full map, warp
+      if (H.mmZoom > 1.05) { H.mmZoom = 1; H.mmCx = 0.5; H.mmCy = 0.5; return; }
+      const i = pickMinimap(e.clientX, e.clientY);
+      if (i >= 0) { H.sel = i; H.startWarp(i); }
+      return;
+    }
     const c = canvasPos(e);
     const i = pickStar(c.x, c.y);
     if (i >= 0) { H.sel = i; H.startWarp(i); }
@@ -98,6 +153,53 @@
     return best;
   }
 
+  // ---- minimap interaction: zoom, pan, click stars ----
+  const MM_W = 120;                              // minimap box size in HUD px
+  const MM_X = () => GM.VW - MM_W - 8;
+  const MM_Y = 8;
+  const MM_PAD = 2;
+
+  // true when a client-space position is over the minimap box
+  function overMinimap(cx, cy) {
+    const hud = document.getElementById('hud');
+    const hr = hud.getBoundingClientRect();
+    const hx = (cx - hr.left) * GM.VW / hr.width;
+    const hy = (cy - hr.top) * GM.VH / hr.height;
+    const mx = MM_X(), my = MM_Y;
+    return hx >= mx - 4 && hx <= mx + MM_W + 4 && hy >= my - 4 && hy <= my + MM_W + 4;
+  }
+
+  // pick a star from the minimap at a client position
+  function pickMinimap(cx, cy) {
+    const hud = document.getElementById('hud');
+    const hr = hud.getBoundingClientRect();
+    const hx = (cx - hr.left) * GM.VW / hr.width;
+    const hy = (cy - hr.top) * GM.VH / hr.height;
+    // minimap-local normalized coords (0-1 within the star area)
+    const nx = U.clamp((hx - MM_X() - MM_PAD) / (MM_W - MM_PAD * 2), 0, 1);
+    const ny = U.clamp((hy - MM_Y - MM_PAD) / (MM_W - MM_PAD * 2), 0, 1);
+    // undo the minimap zoom to get map-normalized coords
+    const mapNx = H.mmCx + (nx - 0.5) / H.mmZoom;
+    const mapNy = H.mmCy + (ny - 0.5) / H.mmZoom;
+    // find the nearest star (radius scales with zoom so distant stars
+    // are pickable when zoomed out, close ones when zoomed in)
+    const rad = 0.012 + 0.008 / H.mmZoom;
+    let best = -1, bd = rad * rad;
+    for (let i = 0; i < H.mm.length; i++) {
+      const dx = H.mm[i][0] - mapNx, dy = H.mm[i][1] - mapNy;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bd) { bd = d2; best = i; }
+    }
+    return best;
+  }
+
+  // clamp the minimap center so we never scroll off the map
+  function mmClamp() {
+    const half = 0.5 / H.mmZoom;
+    H.mmCx = U.clamp(H.mmCx, half, 1 - half);
+    H.mmCy = U.clamp(H.mmCy, half, 1 - half);
+  }
+
   // ---- state ----
   H.ship = null;
   H.cam = null;
@@ -112,6 +214,9 @@
   H.help = true;           // show the controls card until first input
   H.scr = [];              // projected star screen positions this frame
   H.mm = null;             // minimap normalized coords
+  H.mmZoom = 1;            // minimap zoom (1 = full map, 8 = close)
+  H.mmCx = 0.5; H.mmCy = 0.5;   // minimap view center (normalized)
+  H.mmDrag = null;         // active minimap pan drag
   H.flag = [];             // flagship icon frames (16 facings)
   H.sun = [];              // truespacesun frames (5)
   H.planetImgs = [];
@@ -172,6 +277,7 @@
     const spanX = Math.max(1, mxx - mnx), spanY = Math.max(1, mxy - mny);
     H.mm = GM.STARS.map((st) => [(st[2] - mnx) / spanX, (st[3] - mny) / spanY]);
     H.mmBounds = { mnx, mny, spanX, spanY };
+    H.mmZoom = 1; H.mmCx = 0.5; H.mmCy = 0.5; H.mmDrag = null;
 
     // preload nav art (flagship icon facings + the animated sun)
     const nav = GM.CONTENT && GM.CONTENT.navsprites;
@@ -526,37 +632,61 @@
     g.fillText('VEL ' + Math.round(H.ship.spd) + ' U/S' +
       ((k['ShiftLeft'] || k['ShiftRight']) && H.ship.spd > 400 ? '  [BOOST]' : ''), 8, 26);
 
-    // ---- minimap (top-down radar of the whole star map) ----
-    const MW = 100, MX = GM.VW - MW - 8, MY = 8;
-    g.fillStyle = 'rgba(4,6,12,0.78)';
+    // ---- minimap (top-down radar: zoomable, pannable, clickable) ----
+    const MW = MM_W, MX = MM_X(), MY = MM_Y;
+    const mmBox = MW - MM_PAD * 2;
+    g.fillStyle = 'rgba(4,6,12,0.82)';
     g.fillRect(MX, MY, MW, MW);
-    g.strokeStyle = '#1b2438';
+    g.strokeStyle = H.mmDrag ? '#3fc8ff' : '#1b2438';
     g.strokeRect(MX, MY, MW, MW);
+    // stars: transform through the minimap zoom/center
+    const dotSize = H.mmZoom > 3 ? 2 : 1;
     for (let i = 0; i < H.mm.length; i++) {
+      const nx = (H.mm[i][0] - H.mmCx) * H.mmZoom + 0.5;
+      const ny = (H.mm[i][1] - H.mmCy) * H.mmZoom + 0.5;
+      if (nx < 0 || nx > 1 || ny < 0 || ny > 1) continue;
       const st = GM.STARS[i];
       g.fillStyle = COLMAP[st[5]] || '#8fa2c0';
-      g.globalAlpha = 0.55;
-      g.fillRect(MX + H.mm[i][0] * (MW - 6) + 2, MY + H.mm[i][1] * (MW - 6) + 2, 1, 1);
+      g.globalAlpha = i === H.hover ? 1 : 0.55;
+      const ds = i === H.sel ? 2 : dotSize;
+      g.fillRect(MX + MM_PAD + nx * mmBox - (ds >> 1), MY + MM_PAD + ny * mmBox - (ds >> 1), ds, ds);
     }
     g.globalAlpha = 1;
-    // player + heading
+    // player + heading (transformed through the minimap zoom)
     const px = (H.ship.x - H.mmBounds.mnx) / H.mmBounds.spanX;
     const py = (H.ship.y - H.mmBounds.mny) / H.mmBounds.spanY;
-    const ppx = MX + px * (MW - 6) + 2, ppy = MY + py * (MW - 6) + 2;
-    g.fillStyle = '#fff';
-    g.fillRect(ppx - 1, ppy - 1, 3, 3);
-    g.strokeStyle = '#fff';
-    g.globalAlpha = 0.6;
-    g.beginPath();
-    g.moveTo(ppx, ppy);
-    g.lineTo(ppx + Math.cos(H.ship.yaw) * 6, ppy + Math.sin(H.ship.yaw) * 6);
-    g.stroke();
-    g.globalAlpha = 1;
+    const pnx = (px - H.mmCx) * H.mmZoom + 0.5;
+    const pny = (py - H.mmCy) * H.mmZoom + 0.5;
+    if (pnx >= 0 && pnx <= 1 && pny >= 0 && pny <= 1) {
+      const ppx = MX + MM_PAD + pnx * mmBox, ppy = MY + MM_PAD + pny * mmBox;
+      g.fillStyle = '#fff';
+      g.fillRect(ppx - 1, ppy - 1, 3, 3);
+      g.strokeStyle = '#fff';
+      g.globalAlpha = 0.6;
+      g.beginPath();
+      g.moveTo(ppx, ppy);
+      g.lineTo(ppx + Math.cos(H.ship.yaw) * 6, ppy + Math.sin(H.ship.yaw) * 6);
+      g.stroke();
+      g.globalAlpha = 1;
+    }
     if (H.sel !== null && H.sel >= 0) {
-      const sx2 = MX + H.mm[H.sel][0] * (MW - 6) + 2;
-      const sy2 = MY + H.mm[H.sel][1] * (MW - 6) + 2;
-      g.strokeStyle = '#3fc8ff';
-      g.beginPath(); g.arc(sx2, sy2, 4, 0, U.TAU); g.stroke();
+      const snx = (H.mm[H.sel][0] - H.mmCx) * H.mmZoom + 0.5;
+      const sny = (H.mm[H.sel][1] - H.mmCy) * H.mmZoom + 0.5;
+      if (snx >= 0 && snx <= 1 && sny >= 0 && sny <= 1) {
+        const sx2 = MX + MM_PAD + snx * mmBox;
+        const sy2 = MY + MM_PAD + sny * mmBox;
+        g.strokeStyle = '#3fc8ff';
+        g.beginPath(); g.arc(sx2, sy2, 4, 0, U.TAU); g.stroke();
+      }
+    }
+    // zoom indicator + hints
+    if (H.mmZoom > 1.05) {
+      g.font = '7px monospace';
+      g.fillStyle = '#3fc8ff';
+      g.textAlign = 'center';
+      g.fillText('×' + H.mmZoom.toFixed(1), MX + MW / 2, MY + MW - 4);
+      g.fillText('DBL-CLICK resets', MX + MW / 2, MY + MW + 8);
+      g.textAlign = 'left';
     }
 
     // ---- targeted-system panel (under the minimap) ----
@@ -596,7 +726,7 @@
     }
     g.font = '8px monospace';
     g.fillStyle = '#55688a';
-    g.fillText('DRAG look · SCROLL zoom · CLICK target · ENTER warp/visit · W/S thrust · SHIFT boost · H help', GM.VW / 2, GM.VH - 6);
+    g.fillText('DRAG look · CLICK target · ENTER warp · RADAR: scroll=zoom, click=target · H help', GM.VW / 2, GM.VH - 6);
 
     // ---- help card (until first input; H toggles) ----
     if (H.help) {
@@ -613,7 +743,8 @@
         'CLICK a star — target it · ENTER or DOUBLE-CLICK — warp there',
         'When you arrive in range: ENTER again to enter the system',
         'W — thrust · S — brake · SHIFT — boost · A/D or ←/→ — yaw · R/F or ↑/↓ — pitch',
-        'Top right: the radar shows the whole map — you are the white dot',
+        'Top right radar: scroll to zoom in, drag to pan, click stars to target',
+        '  (double-click a zoomed radar resets to the full map)',
         '',
         'press any key or click to begin · H shows this again',
       ];
