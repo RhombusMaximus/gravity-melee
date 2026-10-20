@@ -1,6 +1,6 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.24.1';
+  GM.VERSION = '0.24.2';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
@@ -267,6 +267,7 @@
       weapon: { label: 'Howitzer', kind: 'shot', cd: 0.18, cost: 1.5, speed: 280, dmg: 4, size: 3, life: 1.0, count: 1, spread: 0.04, tol: 0.2, snd: 'shot' },
       special: { label: 'Marines', type: 'fighters', cost: 0, cd: 3.5, fspeed: 220, flife: 5, laserRange: 90, laserDmg: 3, laserCd: 0.8 },
     },
+/* hidden for now
     {
       // CH-42 Avatar — the Chmmr crystal powerhouse (chmmr.c stats).
       key: 'avatar', name: 'CH-42 Avatar', role: 'heavy cruiser', cost: 28,
@@ -277,6 +278,7 @@
       special: { label: 'Zap Satellites', type: 'satellites', cost: 6, cd: 4,
                  satHP: 2, satOrbit: 60, satZap: 160, zapDmg: 3, maxSats: 3 },
     },
+    */
     {
       // CJ-36 Broodhome — the Chenjesu crystal dreadnought (chenjesu.c: 36
       // crew, 30 battery, the photon crystal + autonomous DOGI harvesters).
@@ -287,6 +289,7 @@
       weapon: { label: 'Photon Crystal', kind: 'plasma', cd: 1.3, cost: 5, speed: 150, dmg: 6, size: 6, life: 2.4, count: 1, spread: 0, tol: 0.17, aoe: 30, snd: 'plasma' },
       special: { label: 'DOGI Crystals', type: 'missile', cost: 20, cd: 2.5, speed: 110, dmg: 3, life: 5, turn: 2.2, snd: 'missile' },
     },
+/* hidden for now
     {
       // KH-42 Marauder — the Kohr-Ah blade-thrower (blackurq.c stats).
       key: 'marauder', name: 'KH-42 Marauder', role: 'dreadnought', cost: 30,
@@ -296,6 +299,7 @@
       weapon: { label: 'F.R.I.E.D.', kind: 'plasma', cd: 1.0, cost: 6, speed: 155, dmg: 10, size: 6, life: 2.0, count: 1, spread: 0, tol: 0.2, aoe: 36, snd: 'plasma' },
       special: { label: 'Buzzsaw Blades', type: 'mine', cost: 12, cd: 1.5, dmg: 8, rad: 22, maxMines: 6, snd: 'mine' },
     },
+    */
     {
       // UQ-42 Dreadnought — the Ur-Quan Kzer-Za flagship (urquan.c: 42
       // crew, 42 battery, fusion bolts + autonomous fighters that ARE crew).
