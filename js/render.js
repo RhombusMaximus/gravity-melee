@@ -827,6 +827,24 @@
         const sh = img.naturalHeight * px;
         g.imageSmoothingEnabled = false;
         g.drawImage(img, Math.round(x - sw / 2), Math.round(y - sh / 2), sw, sh);
+        // Orz Nemesis: the howitzer turret rides on top of the ship —
+        // draw it in the preview too (pointing forward, like the ship)
+        if (spec.turret && GM.CONTENT.shipsprites.orz_turret) {
+          let timg = PREVIEW_CACHE['orz_turret'];
+          if (!timg) {
+            timg = new Image();
+            timg.src = GM.CONTENT.shipsprites.orz_turret;
+            PREVIEW_CACHE['orz_turret'] = timg;
+          }
+          if (timg.complete && timg.naturalWidth > 0) {
+            const tpx = px;
+            const tw = timg.naturalWidth * tpx;
+            const th = timg.naturalHeight * tpx;
+            // anchor (6,11) from turret-big.ani: position the turret's
+            // rotation point on the ship's centre, facing north
+            g.drawImage(timg, Math.round(x - 6 * tpx), Math.round(y - 11 * tpx), tw, th);
+          }
+        }
       } else {
         img.onload = () => { /* next frame will pick it up */ };
         g.strokeStyle = '#2a3450';
