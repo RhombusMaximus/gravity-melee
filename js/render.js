@@ -770,7 +770,7 @@
     g.font = '8px monospace';
     g.fillStyle = '#55688a';
     g.fillText('[1] 1v1 · 30 pts    [2] 2v2 · 50 pts    [3] 3v3v3 · 66 pts', GM.VW / 2, 168);
-    g.fillText('[4] HYPERSPACE — the 3D star map    [O] ORIGINAL SOUNDTRACK', GM.VW / 2, 182);
+    g.fillText('[4] HYPERSPACE — the 3D star map    [5] SURVIVAL    [O] SOUNDTRACK', GM.VW / 2, 182);
     g.fillText('F take helm (your team) · WASD fly · Q/E strafe · SPACE fire · SHIFT special', GM.VW / 2, 196);
     g.fillText('TAB cycle targets · X release helm · C wingmen focus fire · G minds · P pause · M mute · [ ] volume', GM.VW / 2, 210);
     g.fillStyle = '#3c4a66';
@@ -791,7 +791,7 @@
     g.fillText('FLEET ASSEMBLY', GM.VW / 2, 32);
     g.font = '9px monospace';
     g.fillStyle = '#8fa2c0';
-    g.fillText(mode.label + '  ·  AZURE squadron  ·  every team flies under the same point budget', GM.VW / 2, 46);
+    g.fillText(mode.label + (mode.key === '5' ? ' — one ship, endless waves · enemies ramp up' : '  ·  AZURE squadron  ·  every team flies under the same point budget'), GM.VW / 2, 46);
 
     // budget bar
     const bw = 220, bx = GM.VW / 2 - bw / 2, by = 56;
@@ -840,7 +840,7 @@
     // roster reference line
     g.font = '8px monospace';
     g.fillStyle = '#55688a';
-    g.fillText(GM.SHIPS.length + ' SC2 SHIPS · 5–30 PTS · FULL SUPER MELEE ROSTER', GM.VW / 2, GM.VH - 40);
+    g.fillText(GM.SHIPS.length + ' SC2 SHIPS · 5–30 PTS · ' + (mode.key === '5' ? 'PICK YOUR FIGHTER' : 'FULL SUPER MELEE ROSTER'), GM.VW / 2, GM.VH - 40);
 
     const blink = Math.sin(t * 3) > -0.3;
     if (blink) {
@@ -850,7 +850,7 @@
     }
     g.font = '8px monospace';
     g.fillStyle = '#55688a';
-    g.fillText('A/D cycle ship · W/S pick slot · R random loadout · ESC back', GM.VW / 2, GM.VH - 10);
+    g.fillText(mode.key === '5' ? 'A/D cycle ship · ENTER deploy · ESC back' : 'A/D cycle ship · W/S pick slot · R random loadout · ESC back', GM.VW / 2, GM.VH - 10);
     g.textAlign = 'left';
   };
 
@@ -877,18 +877,42 @@
     }
     g.font = '8px monospace';
     let yy = y0 + 56;
-    world.teams.forEach((teamShips, ti) => {
-      const T = GM.TEAMS[ti];
-      g.fillStyle = T.P;
-      g.fillText(T.name, GM.VW / 2 - 120, yy);
-      yy += 11;
-      for (const s of teamShips) {
-        g.fillStyle = s.dead ? '#4a5468' : '#aebdd6';
-        g.fillText((s.dead ? '  ✝ ' : '  ★ ') + s.name.padEnd(8) + ' — ' + s.spec.name + ' — kills ' + s.kills, GM.VW / 2 - 120, yy);
-        yy += 11;
+    if (world.survival) {
+      g.textAlign = 'center';
+      g.font = 'bold 12px monospace';
+      g.fillStyle = '#ff9a5a';
+      g.fillText('WAVES CLEARED: ' + world.survivalKills, GM.VW / 2, yy);
+      yy += 16;
+      g.font = '10px monospace';
+      g.fillStyle = '#cfe0ff';
+      const t = world.survivalTime || world.time;
+      g.fillText('TIME SURVIVED: ' + Math.floor(t / 60) + ':' + ('0' + Math.floor(t % 60)).slice(-2), GM.VW / 2, yy);
+      yy += 16;
+      g.fillStyle = '#8fa2c0';
+      g.fillText('ENEMY BUDGET REACHED: ' + world.survivalCost + ' pts', GM.VW / 2, yy);
+      yy += 20;
+      const p1 = world.teams[0][0];
+      if (p1) {
+        g.fillText(p1.name + ' aboard the ' + p1.spec.name, GM.VW / 2, yy);
+        yy += 12;
+        g.fillStyle = '#4a5468';
+        g.fillText('hits taken: ' + (p1.spec.crew - Math.max(0, p1.crew) >= 0 ? Math.round(p1.spec.crew - p1.crew) : '?'), GM.VW / 2, yy);
       }
-      yy += 6;
-    });
+      g.textAlign = 'left';
+    } else {
+      world.teams.forEach((teamShips, ti) => {
+        const T = GM.TEAMS[ti];
+        g.fillStyle = T.P;
+        g.fillText(T.name, GM.VW / 2 - 120, yy);
+        yy += 11;
+        for (const s of teamShips) {
+          g.fillStyle = s.dead ? '#4a5468' : '#aebdd6';
+          g.fillText((s.dead ? '  ✝ ' : '  ★ ') + s.name.padEnd(8) + ' — ' + s.spec.name + ' — kills ' + s.kills, GM.VW / 2 - 120, yy);
+          yy += 11;
+        }
+        yy += 6;
+      });
+    }
     const blink = Math.sin((GM.clockT || 0) * 3) > -0.3;
     if (blink) {
       g.font = 'bold 11px monospace';

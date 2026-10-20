@@ -83,6 +83,7 @@
       if (c === 'Digit1') enterSelect(GM.MODES[0]);
       else if (c === 'Digit2') enterSelect(GM.MODES[1]);
       else if (c === 'Digit3') enterSelect(GM.MODES[2]);
+      else if (c === 'Digit5') enterSelect(GM.MODES[3]);
       else if (c === 'Digit4' && GM.HYPER) {
         GM.HYPER.init();
         GM.state = 'hyper';
@@ -152,6 +153,7 @@
     const mine = GM.world.ships.filter((s) => !s.dead && s.team === GM.playerTeam);
     // prefer P1 if still alive, else the first living teammate
     const next = (GM.world.p1 && !GM.world.p1.dead) ? GM.world.p1 : mine[0];
+    if (!next && GM.world.survival) return;   // survival: no teammates to hop to
     if (next) {
       GM.humanShip = next;
       next.human = true;
@@ -279,7 +281,7 @@
 
   // ---------- game flow ----------
   function startGame(mode, picks) {
-    GM.world = new GM.World(mode, picks ? { picks } : {});
+    GM.world = new GM.World(mode, picks ? { picks, survival: mode.key === '5' } : { survival: mode.key === '5' });
     // capture the actual deployed ships for rematch (same fleet matchup)
     GM.lastPicks = GM.world.teams.map(function (team) {
       return team.map(function (s) { return s.spec.key; });

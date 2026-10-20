@@ -1,14 +1,14 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.19.0';
+  GM.VERSION = '0.20.0';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
   // speeds, weapon ranges) so duels fill the bigger world at the same pacing.
   GM.SCALE = 2.4;
 
-  GM.W = 2796;
-  GM.H = 1290;
+  GM.W = 5592;
+  GM.H = 2580;
   GM.WV = 2304;   // world-view canvas: zoomed out, most of the arena visible
   GM.WH = 1296;
   GM.VW = 640;    // HUD overlay canvas (all HUD code draws in this space)
@@ -23,9 +23,11 @@
 
   GM.PHYS = {
     dt: 1 / 60,
-    planet: { x: 1398, y: 645, r: 90, GM: 2246400, rInf: 480, knee: 390, aCap: 1248 },
-    moon:   { r: 26, GM: 126720, rInf: 200, knee: 150, aCap: 720, orbitR: 360, omega: 0.34 },
-    spawnR: 260,
+    // doubled: the arena and its gravity well are 2x, ships stay the same
+    // size — the camera zoom shows less at once, making it feel vast
+    planet: { x: 2796, y: 1290, r: 180, GM: 8985600, rInf: 960, knee: 780, aCap: 2496 },
+    moon:   { r: 52, GM: 506880, rInf: 400, knee: 300, aCap: 1440, orbitR: 720, omega: 0.17 },
+    spawnR: 520,
     surgeAt: 170,
     surgeRate: 0.02,
     surgeMax: 3.0,
@@ -344,6 +346,7 @@
     { key: '1', label: '1 v 1',       teams: [1, 1],       budget: 30 },
     { key: '2', label: '2 v 2',       teams: [2, 2],       budget: 50 },
     { key: '3', label: '3 v 3 v 3',   teams: [3, 3, 3],    budget: 66 },
+    { key: '5', label: 'SURVIVAL',    teams: [1, 0],       budget: 30 },
   ];
 
   GM.PILOTS = [

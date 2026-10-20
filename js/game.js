@@ -23,6 +23,11 @@
       this.ships = [];
       this.fighters = [];      // Kzer-Za autonomous interceptors
       this.teams = [];
+      this.survival = !!(opts && opts.survival);
+      this.survivalWave = 0;
+      this.survivalKills = 0;
+      this.survivalDelay = 0;   // seconds until the next enemy spawns
+      this.survivalCost = 10;  // enemy point budget, ramps with waves
 
       const P = GM.PHYS.planet;
       const nTeams = mode.teams.length;
@@ -68,6 +73,31 @@
 
       // Player 1: the first ship of the first team — camera & possession anchor
       this.p1 = this.teams[0][0];
+
+      // survival: seed the first enemy
+      if (this.survival) this.spawnSurvivalEnemy();
+    }
+
+    // ---- survival mode: endless waves of escalating enemies ----
+    spawnSurvivalEnemy() {
+      const P = GM.PHYS.planet;
+      const affordable = GM.SHIPS.filter((s) => s.cost <= this.survivalCost);
+      const pool = affordable.length ? affordable : GM.SHIPS;
+      const spec = U.pick(pool);
+      // spawn on the ring, opposite the player's current position
+      const p1 = this.teams[0][0];
+      const baseA = p1 ? Math.atan2(p1.y - P.y, p1.x - P.x) + Math.PI : U.rand(0, U.TAU);
+      const a = baseA + U.rand(-0.5, 0.5);
+      const rr = GM.PHYS.spawnR * 1.4;
+      const ship = new GM.Ship(spec, 1, U.pick(GM.PILOTS), U.pick(GM.ARCHETYPES));
+      ship.x = U.wrapX(P.x + Math.cos(a) * rr);
+      ship.y = U.wrapY(P.y + Math.sin(a) * rr);
+      ship.ang = a + Math.PI;
+      ship.aiBrain = GM.AI.mkBrain();
+      if (!this.teams[1]) this.teams[1] = [];
+      this.teams[1].push(ship);
+      this.ships.push(ship);
+      GM.FX.float(ship.x, ship.y - 20, 'WAVE ' + (this.survivalWave + 1), '#ff9a5a');
     }
 
     moonPos() {
@@ -616,15 +646,55 @@
 
       GM.FX.update(dt);
 
-      // victory check
+      // ---- survival mode logic ----
+      if (this.survival && this.winner === null) {
+        const enemies = this.ships.filter((s) => !s.dead && s.team !== 0);
+        if (enemies.length === 0) {
+          if (this.survivalDelay <= 0 && this.survivalWave > 0) {
+            // an enemy just died (we already counted the wave)
+          } else if (this.survivalDelay <= 0 && this.survivalWave === 0 && this.ships.some(s => s.team === 1 && s.dead)) {
+            // first enemy died
+          }
+          if (this.survivalDelay <= 0 && this.ships.some((s) => s.team === 1 && s.dead)) {
+            this.survivalDelay = 3;   // 3-second breather between waves
+          }
+        }
+        if (this.survivalDelay > 0) {
+          this.survivalDelay -= dt;
+          if (this.survivalDelay <= 0) {
+            this.survivalWave++;
+            this.survivalKills++;
+            this.survivalCost = Math.min(30, 10 + this.survivalWave * 2);
+            // remove dead enemy ships from the arrays to keep things clean
+            this.ships = this.ships.filter((s) => !s.dead || s.team === 0);
+            this.teams[1] = this.teams[1].filter((s) => !s.dead);
+            this.spawnSurvivalEnemy();
+          }
+        }
+        // survival ends when the PLAYER dies (no enemy team to win)
+        const playerAlive = this.teams[0].some((s) => !s.dead);
+        if (!playerAlive) {
+          this.winner = 1;
+          this.survivalTime = this.time;
+          this.shots.length = 0;
+          this.missiles.length = 0;
+          this.fighters.length = 0;
+          for (const s of this.ships) s.mines.length = 0;
+          GM.FX.shake = 0;
+          GM.FX.flash = 0;
+        }
+      }
+
+      // victory check (normal modes)
       let justWon = false;
-      if (this.winner === null) {
+      if (this.winner === null && !this.survival) {
         const aliveTeams = new Set();
         let anyAlive = false;
         for (const s of this.ships) if (!s.dead) { aliveTeams.add(s.team); anyAlive = true; }
         if (!anyAlive) { this.winner = -1; justWon = true; }
         else if (aliveTeams.size === 1) { this.winner = [...aliveTeams][0]; justWon = true; }
       }
+      if (this.survival && this.winner !== null) justWon = true;
       // moment of victory: defuse lingering ordnance, zero screenshake/flash
       if (justWon) {
         this.shots.length = 0;
