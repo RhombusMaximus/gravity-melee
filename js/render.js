@@ -14,6 +14,12 @@
     if (GM.CONTENT.boomsprites && !R.boomImgs) {
       R.boomImgs = GM.CONTENT.boomsprites.f.map((uri) => { const i = new Image(); i.src = uri; return i; });
     }
+    if (C['chmmr_sat'] && !R.satImgs) {
+      R.satImgs = C['chmmr_sat'].f.map((uri) => { const i = new Image(); i.src = uri; return i; });
+    }
+    if (C['shofixti_destruct'] && !R.destructImgs) {
+      R.destructImgs = C['shofixti_destruct'].f.map((uri) => { const i = new Image(); i.src = uri; return i; });
+    }
   };
   R.init = () => {
     R.preloadWeapons();
@@ -332,27 +338,57 @@
         g.globalAlpha = 1;
         g.lineWidth = 1;
       }
+      // Orz-style marine: wobbly tentacle blob with an eye
       g.save();
       g.translate(e.x, e.y);
-      g.rotate(f.ang + Math.PI / 2);
+      const wob = Math.sin(t * 12 + (f.orbitA || 0)) * 0.8;
+      g.rotate(f.ang + Math.PI / 2 + wob * 0.3);
+      const bodyR = 2.5 * fz;
       g.fillStyle = GM.TEAMS[f.team].P;
-      g.fillRect(-1.5 * fz, -2 * fz, 3 * fz, 5 * fz);
-      g.fillStyle = '#7cff5e';
-      g.fillRect(-1 * fz, -3.5 * fz, 2 * fz, 1.5 * fz);
-      if (U.chance(0.6)) {
-        g.fillStyle = '#ffca7a';
-        g.fillRect(-0.5 * fz, 3 * fz, 1 * fz, 1.5 * fz);
-      }
+      g.beginPath(); g.arc(0, 0, bodyR, 0, U.TAU); g.fill();
+      g.fillStyle = '#fff';
+      g.beginPath(); g.arc(0, -bodyR * 0.4, bodyR * 0.35, 0, U.TAU); g.fill();
+      g.fillStyle = '#000';
+      g.beginPath(); g.arc(0, -bodyR * 0.4, bodyR * 0.15, 0, U.TAU); g.fill();
+      g.strokeStyle = GM.TEAMS[f.team].P;
+      g.lineWidth = 1;
+      g.beginPath();
+      g.moveTo(-bodyR * 0.5, bodyR);
+      g.quadraticCurveTo(-bodyR, bodyR * 1.8 + wob, -bodyR * 0.3, bodyR * 2.5);
+      g.moveTo(bodyR * 0.5, bodyR);
+      g.quadraticCurveTo(bodyR, bodyR * 1.8 - wob, bodyR * 0.3, bodyR * 2.5);
+      g.stroke();
       g.restore();
     }
 
+    // Chmmr Avatar zap satellites: original orbiting sprite
+    if (world.sats && R.satImgs) {
+      for (const sat of world.sats) {
+        if (sat.hp <= 0 || !sat.by || sat.by.dead) continue;
+        const e = U.eff(sat.x, sat.y);
+        if (e.x < -10 || e.x > GM.WV + 10 || e.y < -10 || e.y > GM.WH + 10) continue;
+        const img = R.satImgs[Math.floor(t * 10) % R.satImgs.length];
+        if (img && img.complete && img.naturalWidth > 0) {
+          const sc = Math.max(3, Math.round(3 * zs));
+          const sw = img.naturalWidth * sc, shh = img.naturalHeight * sc;
+          g.imageSmoothingEnabled = false;
+          g.drawImage(img, e.x - sw / 2, e.y - shh / 2, sw, shh);
+        } else {
+          g.fillStyle = '#8ef2ff';
+          g.beginPath(); g.arc(e.x, e.y, 3 * zs, 0, U.TAU); g.fill();
+        }
+      }
+    }
+
     // explosion animations: original SC2 boom sprites
-    if (R.boomImgs && world.explosions) {
+    if (world.explosions) {
       for (const ex of world.explosions) {
         const e = U.eff(ex.x, ex.y);
-        const n = R.boomImgs.length;
+        const imgSet = ex.sprite === 'shofixti_destruct' && R.destructImgs ? R.destructImgs : R.boomImgs;
+        if (!imgSet) continue;
+        const n = imgSet.length;
         const fi = Math.min(n - 1, Math.floor(ex.t / ex.dur * n));
-        const img = R.boomImgs[fi];
+        const img = imgSet[fi];
         if (img && img.complete && img.naturalWidth > 0) {
           const sz = (ex.big ? 90 : 45) * zs;
           const alpha = U.clamp(1 - ex.t / ex.dur, 0, 1);

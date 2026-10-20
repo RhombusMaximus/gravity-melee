@@ -59,6 +59,7 @@
       this.burn = 0; this.burnActive = false;
       this.strafing = 0;
       this.mines = [];
+      this.sats = [];      // Chmmr Avatar's orbiting zap satellites
       this.dead = false;
       this.hitT = 0;
       this.thrusting = false;
@@ -257,10 +258,23 @@
           }
           break;
         }
+        case 'satellites': {
+          // respawn any dead satellites
+          let n = 0;
+          for (const sat of this.sats) {
+            if (sat.hp <= 0) { sat.hp = sp.satHP; n++; }
+          }
+          if (n) {
+            GM.A.SND.shield();
+            GM.FX.emit(this.x, this.y, 12, { spd: 60, life: 0.4, col: '#8ef2ff', size: 2 });
+          }
+          break;
+        }
         case 'glory': {
           // Shofixti: the Glory Device — a suicidal detonation
           GM.FX.float(this.x, this.y - 18, 'GLORY!', '#ffd28a');
           world.explode(this.x, this.y, sp.dmg, sp.rad, this, 'blast');
+          world.explosions.push({ x: this.x, y: this.y, t: 0, dur: 0.8, big: true, sprite: 'shofixti_destruct' });
           this.die(world, null);
           break;
         }

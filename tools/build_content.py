@@ -102,7 +102,7 @@ EXTRA_SPRITES = {
 # — the original SC2 projectile art for each ship's primary weapon,
 # animated through up to `max_frames` frames
 WEAPON_SPRITES = {
-    'shofixti':  ('shofixti',  'destruct', 8),   # glory device blast
+    # (shofixti's destruct is a self-destruct explosion, not a weapon projectile)
     'zoqfotpik': ('zoqfotpik', 'spit',     8),   # anti-matter sting
     'umgah':     ('umgah',     'cone',     6),   # cone zap
     'ilwrath':   ('ilwrath',   'fire',     8),  # twin fusion spray
@@ -122,6 +122,9 @@ WEAPON_SPRITES = {
     'kohrah':    ('kohrah',    'gas',       8),  # F.R.I.E.D.
     'urquan':    ('urquan',    'fusion',    8),  # fusion bolt
     'melnorme':  ('melnorme',  'pumpup',    6),  # charged orb
+    # non-weapon sprite sets keyed by content name:
+    'shofixti_destruct': ('shofixti', 'destruct', 8),   # glory device blast
+    'chmmr_sat':         ('chmmr',    'satellite', 8),  # Avatar's orbiting drones
 }
 
 # melee explosion animation frames (battle/boom-big-000..003.png)

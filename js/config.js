@@ -1,6 +1,6 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.23.0';
+  GM.VERSION = '0.24.0';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
@@ -274,7 +274,8 @@
       crew: 42, batt: 42, regen: 8, orbit: 65,
       sprite: 'SHIP:chmmr', cap: 'chmmr', icon: 'chmmr',
       weapon: { label: 'Auto Laser', kind: 'dart', cd: 0.06, cost: 0.8, speed: 330, dmg: 2, size: 2, life: 0.8, count: 1, spread: 0.02, tol: 0.16, snd: 'laser' },
-      special: { label: 'Satellite Screen', type: 'shield', cost: 6, cd: 2, dur: 1.6 },
+      special: { label: 'Zap Satellites', type: 'satellites', cost: 6, cd: 4,
+                 satHP: 2, satOrbit: 60, satZap: 160, zapDmg: 3, maxSats: 3 },
     },
     {
       // CJ-36 Broodhome — the Chenjesu crystal dreadnought (chenjesu.c: 36

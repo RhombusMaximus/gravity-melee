@@ -22,6 +22,7 @@
       this.winner = null;      // null = ongoing, -1 = draw, else team idx
       this.ships = [];
       this.explosions = [];   // active boom animations
+      this.sats = [];         // orbiting zap satellites (Chmmr Avatar)
       this.fighters = [];      // Kzer-Za autonomous interceptors
       this.teams = [];
       this.survival = !!(opts && opts.survival);
@@ -71,6 +72,20 @@
         }
         this.teams.push(teamShips);
       });
+
+      // Chmmr Avatar satellites: initialize orbiting drones
+      for (const s of this.ships) {
+        if (s.spec.special.type === 'satellites') {
+          const sp = s.spec.special;
+          for (let i = 0; i < sp.maxSats; i++) {
+            this.sats.push({
+              by: s, team: s.team, hp: sp.satHP,
+              orbitA: (i / sp.maxSats) * U.TAU,
+              x: s.x, y: s.y,
+            });
+          }
+        }
+      }
 
       // Player 1: the first ship of the first team — camera & possession anchor
       this.p1 = this.teams[0][0];
@@ -655,6 +670,63 @@
               if (b.spawnProt <= 0) b.damage(dmgB, a, this, 'crash');
               a.crashT = 0.5; b.crashT = 0.5;
             }
+          }
+        }
+      }
+
+      // Chmmr satellites: orbit, zap incoming, ram enemies
+      for (let si = this.sats.length - 1; si >= 0; si--) {
+        const sat = this.sats[si];
+        const owner = sat.by;
+        if (!owner || owner.dead) { this.sats.splice(si, 1); continue; }
+        if (sat.hp <= 0) continue;
+
+        const sp = owner.spec.special;
+        sat.orbitA += 2.2 * dt;
+        const oR = sp.satOrbit;
+        sat.x = owner.x + Math.cos(sat.orbitA) * oR;
+        sat.y = owner.y + Math.sin(sat.orbitA) * oR;
+
+        // zap incoming enemy shots
+        for (let j = this.shots.length - 1; j >= 0; j--) {
+          const sh = this.shots[j];
+          if (sh.team === sat.team) continue;
+          const w = U.wrapDelta(sat.x, sat.y, sh.x, sh.y);
+          if (U.len(w.x, w.y) < sp.satZap) {
+            this.shots.splice(j, 1);
+            GM.FX.emit(sh.x, sh.y, 3, { spd: 50, life: 0.3, col: '#ffe98a', size: 1.5 });
+          }
+        }
+        // zap enemy missiles
+        for (let j = this.missiles.length - 1; j >= 0; j--) {
+          const ms = this.missiles[j];
+          if (ms.team === sat.team) continue;
+          const w = U.wrapDelta(sat.x, sat.y, ms.x, ms.y);
+          if (U.len(w.x, w.y) < sp.satZap) {
+            this.missiles.splice(j, 1);
+            GM.FX.emit(ms.x, ms.y, 5, { spd: 60, life: 0.4, col: '#ffe98a', size: 2 });
+          }
+        }
+        // ram enemy ships
+        for (const s2 of this.ships) {
+          if (s2.dead || s2.team === sat.team || s2.spawnProt > 0) continue;
+          const w = U.wrapDelta(sat.x, sat.y, s2.x, s2.y);
+          if (U.len(w.x, w.y) < s2.r + 4) {
+            s2.damage(sp.zapDmg, owner, this, 'shot');
+            owner.totalHits++;
+            GM.FX.emit(sat.x, sat.y, 6, { spd: 80, life: 0.4, col: '#8ef2ff', size: 2 });
+          }
+        }
+        // satellite takes damage from enemy shots
+        for (let j = this.shots.length - 1; j >= 0; j--) {
+          const sh = this.shots[j];
+          if (sh.team === sat.team) continue;
+          const w = U.wrapDelta(sat.x, sat.y, sh.x, sh.y);
+          if (U.len(w.x, w.y) < 8) {
+            sat.hp--;
+            this.shots.splice(j, 1);
+            if (sat.hp <= 0) GM.FX.emit(sat.x, sat.y, 8, { spd: 60, life: 0.4, col: '#8ef2ff', size: 2 });
+            break;
           }
         }
       }
