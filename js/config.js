@@ -1,6 +1,6 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.26.1';
+  GM.VERSION = '0.27.0';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
@@ -227,7 +227,7 @@
       crew: 8, batt: 12, regen: 0, orbit: 65,
       sprite: 'SHIP:pkunk', cap: 'pkunk', icon: 'pkunk',
       weapon: { label: 'Triple Peck', kind: 'shot', cd: 0.14, cost: 0.5, speed: 300, dmg: 2, size: 2, life: 0.5, count: 3, spread: 0.14, tol: 0.25, snd: 'shot' },
-      special: { label: 'Rebirth', type: 'shield', cost: 2, cd: 8, dur: 3.0 },
+      special: { label: 'Rebirth', type: 'rebirth', chance: 0.5, cost: 0, cd: 0 },
     },
     {
       // MY-20 Podship — the Mycon bioship (mycon.c stats).

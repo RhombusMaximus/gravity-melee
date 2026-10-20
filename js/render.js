@@ -384,6 +384,36 @@
       }
     }
 
+    // Pkunk rebirth: rainbow ship-ghosts spiral back into the hull
+    if (world.rebirths) {
+      const RB_COLORS = ['#ff5648', '#ffab3d', '#ffd85e', '#7cff5e', '#3fc8ff', '#b48eff'];
+      for (const rb of world.rebirths) {
+        const p = rb.t / rb.dur;
+        for (let ci = 0; ci < RB_COLORS.length; ci++) {
+          const ang = (ci / RB_COLORS.length) * U.TAU + rb.t * 4;
+          const dist = (1 - p) * 120;
+          const x = rb.x + Math.cos(ang) * dist;
+          const y = rb.y + Math.sin(ang) * dist;
+          const e = U.eff(x, y);
+          if (e.x < -10 || e.x > GM.WV + 10 || e.y < -10 || e.y > GM.WH + 10) continue;
+          const sz = (3 + p * 4) * zs;
+          g.fillStyle = RB_COLORS[ci];
+          g.globalAlpha = 0.7 * (1 - p) + 0.3;
+          g.beginPath();
+          g.ellipse(e.x, e.y, sz * 0.6, sz, ang, 0, U.TAU);
+          g.fill();
+        }
+        // bright core flash as they converge
+        if (p > 0.6) {
+          const ce = U.eff(rb.x, rb.y);
+          g.fillStyle = '#fff';
+          g.globalAlpha = (p - 0.6) * 2;
+          g.beginPath(); g.arc(ce.x, ce.y, 8 * zs, 0, U.TAU); g.fill();
+        }
+        g.globalAlpha = 1;
+      }
+    }
+
     // point-defense laser beams (Human Cruiser): cyan lines to zapped targets
     if (world.pdBeams) {
       g.strokeStyle = '#ffe98a';

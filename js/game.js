@@ -24,6 +24,7 @@
       this.explosions = [];   // active boom animations
       this.sats = [];         // orbiting zap satellites (Chmmr Avatar)
       this.pdBeams = [];       // point-defense laser beams (visual)
+      this.rebirths = [];      // Pkunk rebirth rainbow effects
       this.fighters = [];      // Kzer-Za autonomous interceptors
       this.teams = [];
       this.survival = !!(opts && opts.survival);
@@ -737,6 +738,10 @@
       for (let i = this.pdBeams.length - 1; i >= 0; i--) {
         this.pdBeams[i].t -= dt;
         if (this.pdBeams[i].t <= 0) this.pdBeams.splice(i, 1);
+      }
+      for (let i = this.rebirths.length - 1; i >= 0; i--) {
+        this.rebirths[i].t += dt;
+        if (this.rebirths[i].t >= this.rebirths[i].dur) this.rebirths.splice(i, 1);
       }
 
       for (let i = this.explosions.length - 1; i >= 0; i--) {

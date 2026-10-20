@@ -295,6 +295,9 @@
           }
           break;
         }
+        case 'rebirth':
+          // passive — the 50% resurrection fires automatically on death
+          break;
         case 'satellites': {
           // respawn any dead satellites
           let n = 0;
@@ -469,6 +472,25 @@
 
     die(world, by) {
       if (this.dead) return;
+
+      // Pkunk rebirth: flat 50% chance to resurrect immediately with
+      // full crew and battery — can chain forever (the original's
+      // HALLELUJAH!). The ship never actually dies on a successful roll.
+      if (this.spec.special.type === 'rebirth' && Math.random() < (this.spec.special.chance || 0.5)) {
+        this.crew = this.crewMax;
+        this.batt = this.battMax;
+        this.wcd = 0; this.scd = 0.5;
+        this.hitT = 0;
+        this.spawnProt = 1.0;
+        this.shield = 0; this.blazerT = 0; this.cloakT = 0; this.slowT = 0;
+        this.rebirths = (this.rebirths || 0) + 1;
+        world.rebirths.push({ x: this.x, y: this.y, t: 0, dur: 1.0, ship: this });
+        GM.FX.float(this.x, this.y - 22, 'HALLELUJAH!', '#9dff7a');
+        GM.FX.emit(this.x, this.y, 20, { spd: 100, life: 0.6, col: '#9dff7a', size: 2 });
+        if (!GM.A.playBuf('pkunk_rebirth', 0.8)) GM.A.SND.crew();
+        return;   // NOT dead — reborn!
+      }
+
       this.dead = true;
       if (by && by !== this && by.team !== this.team) by.kills++;
       const S = GM.SCALE;
