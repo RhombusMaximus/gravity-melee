@@ -764,7 +764,7 @@
 
   // ---------- minimap ----------
   R.drawMinimap = (g, world) => {
-    const mw = 92, mh = 44;
+    const mw = 80, mh = 80;   // square minimap for the square arena
     const mx = GM.VW - mw - 6, my = GM.VH - mh - 10;
     g.fillStyle = 'rgba(4,6,12,0.72)';
     g.fillRect(mx, my, mw, mh);
