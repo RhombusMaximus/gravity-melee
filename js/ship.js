@@ -295,9 +295,15 @@
           }
           break;
         }
-        case 'rebirth':
-          // passive — the 50% resurrection fires automatically on death
+        case 'taunt': {
+          // Pkunk insult: shout a random taunt to regenerate battery
+          const n = 1 + (Math.random() * 14 | 0);
+          GM.A.playBuf(this.spec.cap + '_insult' + String(n).padStart(2, '0'), 0.7);
+          this.batt = Math.min(this.battMax, this.batt + (sp.gain || 5));
+          GM.FX.float(this.x, this.y - 16, '+' + (sp.gain || 5) + ' BATT', '#ffd85e');
+          GM.FX.emit(this.x, this.y, 6, { spd: 40, life: 0.4, col: '#ffd85e', size: 2 });
           break;
+        }
         case 'satellites': {
           // respawn any dead satellites
           let n = 0;
@@ -481,7 +487,7 @@
       // Pkunk rebirth: flat 50% chance to resurrect immediately with
       // full crew and battery — can chain forever (the original's
       // HALLELUJAH!). The ship never actually dies on a successful roll.
-      if (this.spec.special.type === 'rebirth' && Math.random() < (this.spec.special.chance || 0.5)) {
+      if (this.spec.special.rebirth && Math.random() < this.spec.special.rebirth) {
         this.crew = this.crewMax;
         this.batt = this.battMax;
         this.wcd = 0; this.scd = 0.5;

@@ -297,6 +297,10 @@
         case 'limpet':
           use = dist < 150 * S && U.chance(0.6);
           break;
+        case 'taunt':
+          // Pkunk: shout insults when battery runs low
+          use = battFrac < 0.5;
+          break;
         case 'afterburner':
           use = (dist > 70 * S && b.mode === 'approach') ||
                 (planetDist < P.r + 40 * S && U.chance(0.5));
