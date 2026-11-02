@@ -376,7 +376,8 @@
     last = now;
 
     if (GM.state === 'hyper' && !GM.paused) {
-      GM.HYPER.update(Math.min(0.05, real * GM.speed));
+      if (GM.HYPER.land && GM.LANDER) GM.LANDER.update(Math.min(0.05, real * GM.speed));
+      else GM.HYPER.update(Math.min(0.05, real * GM.speed));
     }
 
     const simming = (GM.state === 'play' && !GM.paused) || GM.state === 'victory';
@@ -426,6 +427,13 @@
 
     // ===== WORLD LAYER (#cv, 2304x1296) =====
     if (GM.state === 'hyper') {
+      if (GM.HYPER.land && GM.LANDER) {
+        GM.LANDER.drawWorld(g, t);
+        g.restore();
+        hg.clearRect(0, 0, GM.VW, GM.VH);
+        GM.LANDER.drawHUD(hg, t);
+        return;
+      }
       GM.HYPER.drawWorld(g, t);
       g.restore();
       hg.clearRect(0, 0, GM.VW, GM.VH);

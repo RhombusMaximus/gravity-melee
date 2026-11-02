@@ -98,6 +98,18 @@
         } catch (e) { /* skip this one */ }
       }
     }
+    // lander SFX (lander.wavs land_* — the surface minigame)
+    if (GM.CONTENT.lander && GM.CONTENT.lander.wavs) {
+      for (const [name, uri] of Object.entries(GM.CONTENT.lander.wavs)) {
+        try {
+          const raw = atob(uri.split(',')[1]);
+          const buf = new ArrayBuffer(raw.length);
+          const u8 = new Uint8Array(buf);
+          for (let i = 0; i < raw.length; i++) u8[i] = raw.charCodeAt(i);
+          A.buffers[name] = await ctx.decodeAudioData(buf);
+        } catch (e) { /* skip this one */ }
+      }
+    }
   };
   A.playBuf = (n, vol = 1, rate = 1) => {
     if (!A.ctx || A.muted || GM.SILENT || !A.buffers || !A.buffers[n]) return false;

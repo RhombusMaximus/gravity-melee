@@ -131,6 +131,25 @@ WEAPON_SPRITES = {
 # melee explosion animation frames (battle/boom-big-000..003.png)
 BOOM_SPRITES = 4
 
+# SC2 planetary lander content (content/base/lander): the surface minigame.
+# 'lander' = the 16 facings 0..15 (frames 16..59 of lander.ani are HUD glyphs
+# we draw ourselves); shield = the shield-hit flash; launch/return = the
+# orbit-view descent/ascent overlays; lava/lightning = surface hazards.
+LANDER_SETS = {
+    'lander': ('', 'lander', 16),
+    'shield': ('', 'shield', 16),
+    'launch': ('', 'launch', 27),
+    'return': ('', 'return', 20),
+    'lava': ('hazard/', 'lavaspot', 13),
+    'lightning': ('hazard/', 'lightning', 11),
+}
+# the 11 surface lifeform sprite sets + the 'canned' pickup frames
+LANDER_BIO = ['lifea', 'lifeb', 'lifec', 'lifed', 'lifee', 'lifef',
+              'lifeg', 'lifeh', 'lifei', 'lifej', 'lifek', 'lifecan']
+# 13 lander SFX (content/base/lander/land_*.wav), embedded as land_<key>
+LANDER_WAVS = ['awa', 'bit', 'can', 'die', 'ful', 'get', 'hit', 'hot',
+               'hrt', 'lau', 'lig', 'qua', 'sht']
+
 # The full UQM tracker soundtrack, played by our own miniprotracker
 # (js/protracker.js) on the standalone music.html jukebox page.
 # (group, path under content/base, display name) — exported raw to
@@ -348,6 +367,46 @@ def main():
         ax, ay = fields[3], fields[4]
         parts.append(f'      {p}: [{ax}, {ay}],\n')
     parts.append('    },\n')
+    parts.append('    lander: {\n')
+    parts.append('      f: {\n')
+    for key, (sub, nm, count) in LANDER_SETS.items():
+        ani = git_show(repo, ref, f'{base}/lander/{sub}{nm}.ani').decode('utf-8', 'replace')
+        anchors = []
+        for ln in ani.splitlines():
+            flds = ln.split()
+            if len(flds) >= 5:
+                anchors.append((int(flds[3]), int(flds[4])))
+        n = min(count, len(anchors))
+        parts.append(f'        {key}: {{ f: [\n')
+        for i in range(n):
+            raw = git_show(repo, ref, f'{base}/lander/{sub}{nm}-{i:03d}.png')
+            b64 = base64.b64encode(raw).decode()
+            parts.append(f"          'data:image/png;base64,{b64}',\n")
+        parts.append('        ], a: [' + ', '.join(f'[{ax},{ay}]' for ax, ay in anchors[:n]) + '] },\n')
+    parts.append('      },\n')
+    parts.append('      bio: {\n')
+    for nm in LANDER_BIO:
+        ani = git_show(repo, ref, f'{base}/lander/bio/{nm}.ani').decode('utf-8', 'replace')
+        anchors = []
+        for ln in ani.splitlines():
+            flds = ln.split()
+            if len(flds) >= 5:
+                anchors.append((int(flds[3]), int(flds[4])))
+        n = min(4, len(anchors))
+        parts.append(f'        {nm}: {{ f: [\n')
+        for i in range(n):
+            raw = git_show(repo, ref, f'{base}/lander/bio/{nm}-{i:03d}.png')
+            b64 = base64.b64encode(raw).decode()
+            parts.append(f"          'data:image/png;base64,{b64}',\n")
+        parts.append('        ], a: [' + ', '.join(f'[{ax},{ay}]' for ax, ay in anchors[:n]) + '] },\n')
+    parts.append('      },\n')
+    parts.append('      wavs: {\n')
+    for w in LANDER_WAVS:
+        raw = git_show(repo, ref, f'{base}/lander/land_{w}.wav')
+        b64 = base64.b64encode(raw).decode()
+        parts.append(f"        land_{w}: 'data:audio/wav;base64,{b64}',\n")
+    parts.append('      },\n')
+    parts.append('    },\n')
     parts.append('    license: "CC BY-NC-SA 2.5 -- Star Control II content (c) Toys for Bob, via The Ur-Quan Masters",\n')
     parts.append('  };\n})(window.GM);\n')
 
@@ -386,6 +445,25 @@ def main():
                     f.write(raw)
         raw = git_show(repo, ref, f'{base}/ships/{sp}/{name}-icons-001.png')
         with open(os.path.join(cdir, f'{name}-icons-001.png'), 'wb') as f:
+            f.write(raw)
+    # lander content raw export (assets/lander/) for provenance + inspection
+    ldir = os.path.join(adir, 'lander')
+    os.makedirs(os.path.join(ldir, 'bio'), exist_ok=True)
+    os.makedirs(os.path.join(ldir, 'hazard'), exist_ok=True)
+    for key, (sub, nm, count) in LANDER_SETS.items():
+        d = os.path.join(ldir, sub)
+        for i in range(count):
+            raw = git_show(repo, ref, f'{base}/lander/{sub}{nm}-{i:03d}.png')
+            with open(os.path.join(d, f'{nm}-{i:03d}.png'), 'wb') as f:
+                f.write(raw)
+    for nm in LANDER_BIO:
+        for i in range(4):
+            raw = git_show(repo, ref, f'{base}/lander/bio/{nm}-{i:03d}.png')
+            with open(os.path.join(ldir, 'bio', f'{nm}-{i:03d}.png'), 'wb') as f:
+                f.write(raw)
+    for w in LANDER_WAVS:
+        raw = git_show(repo, ref, f'{base}/lander/land_{w}.wav')
+        with open(os.path.join(ldir, f'land_{w}.wav'), 'wb') as f:
             f.write(raw)
     # the full UQM tracker soundtrack -> assets/music/ + js/musiclist.js
     mdir = os.path.join(adir, 'music')

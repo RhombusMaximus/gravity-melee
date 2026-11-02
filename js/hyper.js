@@ -21,6 +21,21 @@
   window.addEventListener('keydown', (e) => {
     k[e.code] = true;
     if (GM.state !== 'hyper') return;
+    if (H.land) return;                 // the lander owns all keys while landed
+    if (H.sys !== null) {
+      // orbit view: TAB cycles planets, ENTER lands, ESC backs out
+      if (e.code === 'Tab') {
+        e.preventDefault();
+        const nP = 3 + (stable(starName(GM.STARS[H.sys])) % 4);
+        H.landSel = H.landSel < 0 ? 0 : (H.landSel + 1) % nP;
+        GM.A.SND.ui();
+      } else if (e.code === 'Enter') {
+        H.tryLand();
+      } else if (e.code === 'Escape') {
+        H.sys = null; H.landSel = -1; GM.A.startMusic('hyper');
+      } else if (e.code === 'KeyH') { H.help = !H.help; }
+      return;
+    }
     if (e.code === 'Enter') H.activate();
     else if (e.code === 'KeyH') { H.help = !H.help; }
     else if (e.code === 'Escape') {
@@ -42,6 +57,17 @@
              y: (e.clientY - r.top) * cv.height / r.height };
   }
   stage.addEventListener('pointerdown', (e) => {
+    if (GM.state === 'hyper' && H.sys !== null && !H.land) {
+      // orbit view: click a planet to select it
+      const c = canvasPos(e);
+      let best = -1, bd = 90 * 90;
+      for (const p of H.sysScr) {
+        const dx = p.x - c.x, dy = p.y - c.y, d2 = dx * dx + dy * dy;
+        if (d2 < bd) { bd = d2; best = p.i; }
+      }
+      if (best >= 0 && best !== H.landSel) { H.landSel = best; GM.A.SND.ui(); }
+      return;
+    }
     if (!inHyper()) return;
     e.preventDefault();
     H.help = false;
@@ -224,6 +250,13 @@
   H.sun = [];              // truespacesun frames (5)
   H.planetImgs = [];
   H.bg = [];               // far backdrop star directions
+  // ---- campaign surface exploration (lander) ----
+  H.land = null;           // active landing (GM.LANDER owns update/draw)
+  H.landSel = -1;          // selected planet in the orbit view
+  H.landers = 3;           // landers aboard the flagship
+  H.cargo = { cats: [0, 0, 0, 0, 0, 0, 0, 0], bio: 0 };
+  H.summary = null;        // { t, lines } shown over the orbit view
+  H.sysScr = [];           // planet screen positions this frame (orbit view)
 
   // small seeded PRNG for the backdrop + per-system planet layout
   function prng(seed) {
@@ -282,6 +315,9 @@
     H.mmBounds = { mnx, mny, spanX, spanY };
     H.mmZoom = 1; H.mmCx = 0.5; H.mmCy = 0.5; H.mmDrag = null;
     H.days = 1; H.dayT = 0; H.fuel = 100;
+    H.land = null; H.landSel = -1; H.landers = 3;
+    H.cargo = { cats: [0, 0, 0, 0, 0, 0, 0, 0], bio: 0 };
+    H.summary = null;
 
     // preload nav art (flagship icon facings + the animated sun)
     const nav = GM.CONTENT && GM.CONTENT.navsprites;
@@ -384,6 +420,7 @@
     if (H.sys !== null || H.warp) return;
     if (H.near >= 0 && H.nearD < ENTER_RANGE) {
       H.sys = H.near;
+      H.landSel = -1;
       GM.A.startMusic('orbit');
       return;
     }
@@ -394,7 +431,7 @@
     const st = GM.STARS[H.sel];
     const dx = st[2] - H.ship.x, dy = st[3] - H.ship.y, dz = st[4] - H.ship.z;
     const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    if (d < ENTER_RANGE) { H.sys = H.sel; GM.A.startMusic('orbit'); return; }
+    if (d < ENTER_RANGE) { H.sys = H.sel; H.landSel = -1; GM.A.startMusic('orbit'); return; }
     const cost = Math.ceil(d / 1500);
     if (H.fuel < cost) return;   // not enough fuel — the warp doesn't fire
     H.startWarp(H.sel);
@@ -414,6 +451,36 @@
     // warp costs fuel: distance / 1500, rounded up
     H.fuel = Math.max(0, H.fuel - Math.ceil(d / 1500));
     GM.A.SND.blink();
+  };
+
+  // ---- orbit-view planets (deterministic per star) ----
+  // count + orbit geometry shared by drawSystem and the lander
+  H.sysPlanets = (sysIdx) => {
+    const st = GM.STARS[sysIdx];
+    const nm = starName(st);
+    const nP = 3 + (stable(nm) % 4);
+    const list = [];
+    for (let i = 0; i < nP; i++) {
+      const oR = 380 + i * 330 + (stable(nm + i) % 160);
+      const spd = (0.05 + 0.035 * (i % 3)) * ((i % 2) ? 1 : -1);
+      const phase = (stable(nm + 'p' + i) % 628) / 100;
+      const img = (stable(nm + i) + i) % H.planetImgs.length;
+      const d = 110 + (stable(nm + 'd' + i) % 90);
+      list.push({ i, oR, spd, phase, img, d });
+    }
+    return list;
+  };
+
+  // ENTER in the orbit view: land on the selected planet
+  H.tryLand = () => {
+    if (H.landSel < 0 || !GM.LANDER) return;
+    const st = GM.STARS[H.sys];
+    const nm = starName(st);
+    const prof = GM.LANDER.profile(nm, H.landSel);
+    if (!prof) return;
+    if (prof.gas) { GM.A.SND.ui(); return; }        // gas giants: no surface
+    if (H.landers <= 0) { GM.A.SND.ui(); return; }   // no landers left
+    if (GM.LANDER.begin(H.sys, H.landSel, nm)) H.land = GM.LANDER.active;
   };
 
   // ---- rendering ----
@@ -648,27 +715,49 @@
       g.beginPath(); g.arc(CW, CH, 150, 0, U.TAU); g.fill();
     }
 
-    // planets: 3..6 SC2 discs on seeded orbits
-    const nP = 3 + (seed % 4);
-    for (let i = 0; i < nP; i++) {
-      const oR = 380 + i * 330 + (stable(starName(st) + i) % 160);
-      const spd = (0.05 + 0.035 * (i % 3)) * ((i % 2) ? 1 : -1);
-      const phase = (stable(starName(st) + 'p' + i) % 628) / 100;
-      const a = H.t * spd + phase;
-      const px = CW + Math.cos(a) * oR;
-      const py = CH + Math.sin(a) * oR * 0.42;   // slightly tilted orbital plane
+    // planets: 3..6 SC2 discs on seeded orbits (selection + landing hooks)
+    H.sysScr = [];
+    const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI'];
+    const planets = H.sysPlanets(H.sys);
+    for (const p of planets) {
+      const a = H.t * p.spd + p.phase;
+      const px = CW + Math.cos(a) * p.oR;
+      const py = CH + Math.sin(a) * p.oR * 0.42;   // slightly tilted orbital plane
       // orbit path
       g.strokeStyle = '#1b2438';
       g.globalAlpha = 0.8;
       g.beginPath();
-      g.ellipse(CW, CH, oR, oR * 0.42, 0, 0, U.TAU);
+      g.ellipse(CW, CH, p.oR, p.oR * 0.42, 0, 0, U.TAU);
       g.stroke();
       g.globalAlpha = 1;
-      const img = H.planetImgs[(stable(starName(st) + i) + i) % H.planetImgs.length];
+      H.sysScr.push({ i: p.i, x: px, y: py });
+      const img = H.planetImgs[p.img];
       if (img && img.complete && img.naturalWidth > 0) {
-        const d = 110 + (stable(starName(st) + 'd' + i) % 90);
         g.imageSmoothingEnabled = false;
-        g.drawImage(img, px - d / 2, py - d / 2, d, d);
+        g.drawImage(img, px - p.d / 2, py - p.d / 2, p.d, p.d);
+      }
+      // selection reticle + planet label
+      if (H.landSel === p.i) {
+        const bl = 0.7 + 0.3 * Math.sin(t * 5);
+        g.globalAlpha = bl;
+        g.strokeStyle = '#fff';
+        g.lineWidth = 1.5;
+        g.beginPath(); g.arc(px, py, p.d / 2 + 12, 0, U.TAU); g.stroke();
+        g.beginPath(); g.arc(px, py, p.d / 2 + 18, 0, U.TAU); g.stroke();
+        g.globalAlpha = 1;
+        const prof = GM.LANDER && GM.LANDER.profile(starName(st), p.i);
+        if (prof) {
+          g.font = 'bold 15px monospace';
+          g.textAlign = 'center';
+          g.fillStyle = prof.gas ? '#8fa2c0' : '#cfe0ff';
+          g.fillText(prof.name.toUpperCase(), px, py + p.d / 2 + 38);
+          g.font = '12px monospace';
+          g.fillStyle = '#8fa2c0';
+          g.fillText(prof.label.toUpperCase() + (prof.gas ? '' :
+            ' · ' + prof.temp + '\u00B0C · TECT ' + prof.tect + ' · WX ' + prof.wx +
+            ' · LIFE ' + prof.life), px, py + p.d / 2 + 56);
+          g.textAlign = 'left';
+        }
       }
     }
   };
@@ -682,7 +771,44 @@
       g.fillText('SYSTEM: ' + starName(st).toUpperCase(), 8, 14);
       g.font = '8px monospace';
       g.fillStyle = '#8fa2c0';
-      g.fillText('orbit view — [ESC] back to hyperspace', 8, 26);
+      g.fillText('orbit view — [TAB] select planet · [ENTER] land · [ESC] hyperspace', 8, 26);
+      g.fillStyle = '#55688a';
+      g.fillText('LANDERS ' + H.landers + ' · CARGO ' +
+        H.cargo.cats.reduce((a, b) => a + b, 0) + ' MIN · ' + H.cargo.bio + ' BIO', 8, 38);
+      // landing prompt
+      if (H.landSel >= 0 && GM.LANDER) {
+        const prof = GM.LANDER.profile(starName(st), H.landSel);
+        g.textAlign = 'center';
+        g.font = 'bold 11px monospace';
+        const blink = Math.sin(t * 4) > -0.4;
+        if (prof && prof.gas) {
+          g.fillStyle = '#ffab3d';
+          g.fillText(prof.name.toUpperCase() + ' IS A GAS GIANT — CANNOT LAND', GM.VW / 2, GM.VH - 34);
+        } else if (H.landers <= 0) {
+          g.fillStyle = '#ff5648';
+          g.fillText('NO LANDERS LEFT', GM.VW / 2, GM.VH - 34);
+        } else if (blink) {
+          g.fillStyle = '#fff';
+          g.fillText('[ENTER] LAND ON ' + (prof ? prof.name.toUpperCase() : 'PLANET'), GM.VW / 2, GM.VH - 34);
+        }
+        g.textAlign = 'left';
+      }
+      // post-landing summary
+      if (H.summary) {
+        H.summary.t += 1 / 60;
+        if (H.summary.t > 5) H.summary = null;
+        else {
+          g.textAlign = 'center';
+          g.font = 'bold 11px monospace';
+          g.globalAlpha = Math.min(1, (5 - H.summary.t) * 2);
+          H.summary.lines.forEach((ln, i) => {
+            g.fillStyle = i === 0 ? '#fff' : '#8fa2c0';
+            g.fillText(ln, GM.VW / 2, 70 + i * 16);
+          });
+          g.globalAlpha = 1;
+          g.textAlign = 'left';
+        }
+      }
       return;
     }
     if (!H.ship) return;
