@@ -99,7 +99,10 @@
       // turret; the hull holds heading while you swing (our refinement of the
       // original, where the hull turned too — aiming reads far better this way)
       const turretSteer = s.turret && want.special;
-      this.ang += turretSteer ? 0 : turn * fm.turn * slowK * dt;
+      // blazer comet: the form turns on a dime (user-directed refinement —
+      // the original keeps one TURN_WAIT for both forms)
+      const turnK = this.blazerT > 0 ? 1.8 : 1;
+      this.ang += turretSteer ? 0 : turn * fm.turn * slowK * turnK * dt;
       if (turretSteer) this.turretOff += turn * s.turretRate * dt;
 
       let accel = fm.accel * slowK * thrust;
@@ -111,6 +114,16 @@
       if (accel) {
         this.vx += Math.cos(this.ang) * accel * dt;
         this.vy += Math.sin(this.ang) * accel * dt;
+      }
+      if (this.blazerT > 0 && (this.vx || this.vy)) {
+        // comet inertia: rotate the velocity vector toward the nose at up
+        // to 4 rad/s, preserving speed — the comet carves through 90-degree
+        // turns instead of drifting on its old vector
+        const spd = U.len(this.vx, this.vy);
+        const va = Math.atan2(this.vy, this.vx);
+        const na = va + U.clamp(U.angDiff(va, this.ang), -4 * dt, 4 * dt);
+        this.vx = Math.cos(na) * spd;
+        this.vy = Math.sin(na) * spd;
       }
       // strafe: lateral thrust at 60% power (keeps the nose authoritative)
       if (strafe) {
@@ -173,7 +186,9 @@
       const dx = this.x - P.x, dy = this.y - P.y;
       if (U.len(dx, dy) < P.r + this.r - 2) this.crash(world);
 
-      if (this.thrusting && U.chance(0.7)) {
+      // no default thruster trail in blazer form — the comet art carries
+      // its own trail (user-directed)
+      if (this.thrusting && this.blazerT <= 0 && U.chance(0.7)) {
         const back = this.ang + Math.PI;
         GM.FX.emit(this.x + Math.cos(back) * (this.r + 1), this.y + Math.sin(back) * (this.r + 1), 2, {
           ang: back, arc: 0.5, spd: 55,
