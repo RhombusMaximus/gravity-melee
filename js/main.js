@@ -82,7 +82,8 @@
     if (GM.state === 'title') {
       if (c === 'Digit1') enterSelect(GM.MODES[0]);
       else if (c === 'Digit2') enterSelect(GM.MODES[1]);
-      else if (c === 'Digit5') enterSelect(GM.MODES[2]);
+      else if (c === 'Digit3') enterSelect(GM.MODES[2]);
+      else if (c === 'Digit5') enterSelect(GM.MODES[3]);
       else if (c === 'Digit4' && GM.HYPER) {
         GM.HYPER.init();
         GM.state = 'hyper';

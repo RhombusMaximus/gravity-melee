@@ -968,7 +968,7 @@
     }
     g.font = '8px monospace';
     g.fillStyle = '#55688a';
-    g.fillText('[1] 1v1 · 30 pts    [2] 2v2 · 50 pts', GM.VW / 2, 168);
+    g.fillText('[1] 1v1 · 30 pts    [2] 2v2 · 50 pts    [3] 3v3 · 66 pts', GM.VW / 2, 168);
     g.fillText('[4] HYPERSPACE — the star map    [5] SURVIVAL    [O] SOUNDTRACK    [C] CREDITS', GM.VW / 2, 182);
     g.fillText('F take helm (your team) · WASD fly · Q/E strafe · SPACE fire · SHIFT special', GM.VW / 2, 196);
     g.fillText('TAB cycle targets · X release helm · C wingmen focus fire · G minds · P pause · M mute · [ ] volume', GM.VW / 2, 210);
