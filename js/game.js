@@ -239,7 +239,7 @@
         if (s.dead) continue;
         const w = U.wrapDelta(x, y, s.x, s.y);
         const d = U.len(w.x, w.y);
-        if (d < rad + s.r) {
+        if (d < rad + s.er) {
           const k = Math.max(0.15, 1 - d / rad);
           const n = U.norm(w.x, w.y);
           s.vx += n.x * 150 * k;
@@ -339,11 +339,11 @@
         if (s.dead) continue;
         const w = U.wrapDelta(s.x, s.y, mp.x, mp.y);
         const d = U.len(w.x, w.y);
-        if (d < M.r + s.r - 1) {
+        if (d < M.r + s.er - 1) {
           const spd = U.len(s.vx, s.vy);
           const n = U.norm(w.x, w.y);
-          s.x = U.wrapX(mp.x + n.x * (M.r + s.r + 0.5));
-          s.y = U.wrapY(mp.y + n.y * (M.r + s.r + 0.5));
+          s.x = U.wrapX(mp.x + n.x * (M.r + s.er + 0.5));
+          s.y = U.wrapY(mp.y + n.y * (M.r + s.er + 0.5));
           const vn = s.vx * n.x + s.vy * n.y;
           if (vn < 0) { s.vx -= 1.6 * vn * n.x; s.vy -= 1.6 * vn * n.y; }
           const outV = s.vx * n.x + s.vy * n.y;
@@ -413,7 +413,7 @@
           for (const s of this.ships) {
             if (s.dead || s.team === sh.team || s.spawnProt > 0) continue;
             const w = U.wrapDelta(sh.x, sh.y, s.x, s.y);
-            if (U.len(w.x, w.y) < s.r + sh.size * 0.5 + 1) {
+            if (U.len(w.x, w.y) < s.er + sh.size * 0.5 + 1) {
               if (sh.aoe) this.explode(sh.x, sh.y, sh.dmg, sh.aoe, sh.by, 'blast');
               else {
                 s.damage(sh.dmg, sh.by, this, 'shot');
@@ -486,7 +486,7 @@
           for (const s of this.ships) {
             if (s.dead || s.team === ms.team) continue;
             const w = U.wrapDelta(ms.x, ms.y, s.x, s.y);
-            if (U.len(w.x, w.y) < s.r + 3) {
+            if (U.len(w.x, w.y) < s.er + 3) {
               s.damage(ms.dmg, ms.by, this, 'blast');
               if (ms.by) ms.by.totalHits++;
               GM.FX.addShake(2);
@@ -563,7 +563,7 @@
           if (sp && f.tgt && !f.tgt.dead && f.laserCd <= 0 && !(goingHome && hasHome)) {
             const w = U.wrapDelta(f.x, f.y, f.tgt.x, f.tgt.y);
             const d = U.len(w.x, w.y);
-            if (d < sp.laserRange + f.tgt.r) {
+            if (d < sp.laserRange + (f.tgt.er || f.tgt.r)) {
               f.laserCd = sp.laserCd;
               f.beamT = 0.12;
               f.beamAng = U.ang(w.x, w.y);
@@ -591,7 +591,7 @@
             for (const s of this.ships) {
               if (s.dead || s.team === f.team || s.spawnProt > 0) continue;
               const w = U.wrapDelta(f.x, f.y, s.x, s.y);
-              if (U.len(w.x, w.y) < s.r + 4) {
+              if (U.len(w.x, w.y) < s.er + 4) {
                 s.damage(2, f.by, this, 'shot');
                 GM.FX.emit(f.x, f.y, 10, { spd: 80, life: 0.4, col: '#ffd28a', size: 2 });
                 dead = true;
@@ -643,7 +643,7 @@
           if (b.dead) continue;
           const w = U.wrapDelta(a.x, a.y, b.x, b.y);
           const dist = U.len(w.x, w.y);
-          const overlap = a.r + b.r - dist;
+          const overlap = (a.er || a.r) + (b.er || b.r) - dist;
           if (overlap <= 0) continue;
 
           // separate along the collision normal

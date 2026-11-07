@@ -76,6 +76,8 @@
       this.x = 0; this.y = 0; this.vx = 0; this.vy = 0;
       this.ang = 0;
       this.r = spec.r;
+      this.scale = 1;   // proximity scaling near planets/moons (dive effect)
+      this.er = this.r; // effective (scaled) collision radius
       this.crew = spec.crew; this.crewMax = spec.crew;
       this.batt = spec.batt * 0.8; this.battMax = spec.batt;
       this.shield = 0;
@@ -219,8 +221,31 @@
       }
     }
 
+    // proximity scaling: as a ship closes on the planet or a moon it reads
+    // as diving toward the surface — the sprite AND the hitbox shrink over
+    // the last 10 Torch-lengths of approach (Torch render = 50px at zoom 1)
+    updateScale(world) {
+      const P = GM.PHYS.planet, M = GM.PHYS.moon;
+      const RANGE = 500;   // 10 Torch lengths
+      const MIN = 0.35;    // scale floor at contact
+      const one = (d, bodyR) => {
+        const start = bodyR + this.r + RANGE;
+        const end = bodyR + this.r * MIN + 1;
+        if (d >= start) return 1;
+        const t = U.clamp((d - end) / (start - end), 0, 1);
+        return MIN + (1 - MIN) * (t * t * (3 - 2 * t));   // smoothstep
+      };
+      let sc = one(U.len(this.x - P.x, this.y - P.y), P.r);
+      const mp = world.moonPos();
+      const md = U.wrapDelta(this.x, this.y, mp.x, mp.y);
+      sc = Math.min(sc, one(U.len(md.x, md.y), M.r));
+      this.scale = sc;
+      this.er = this.r * sc;
+    }
+
     update(dt, world) {
       if (this.dead) return;
+      this.updateScale(world);
       this.applyInput(dt);
 
       const g = world.gravityAt(this.x, this.y);
@@ -232,7 +257,7 @@
 
       const P = GM.PHYS.planet;
       const dx = this.x - P.x, dy = this.y - P.y;
-      if (U.len(dx, dy) < P.r + this.r - 2) this.crash(world);
+      if (U.len(dx, dy) < P.r + this.er - 2) this.crash(world);
 
       // no default thruster trail in blazer form — the comet art carries
       // its own trail (user-directed)
@@ -633,8 +658,8 @@
       const dx = this.x - P.x, dy = this.y - P.y;
       const d = U.len(dx, dy) || 1;
       const nx = dx / d, ny = dy / d;
-      this.x = P.x + nx * (P.r + this.r + 0.5);
-      this.y = P.y + ny * (P.r + this.r + 0.5);
+      this.x = P.x + nx * (P.r + this.er + 0.5);
+      this.y = P.y + ny * (P.r + this.er + 0.5);
       const vn = this.vx * nx + this.vy * ny;
       if (vn < 0) {           // only reflect if moving into the planet
         this.vx -= 1.6 * vn * nx;
@@ -662,7 +687,7 @@
       if (this.dead) return;
       const T = GM.TEAMS[this.team];
       const e = U.eff(this.x, this.y);        // camera-space position
-      const PS = Math.max(2, Math.round(2.25 * GM.zoomCur));   // pixel scale, 25% smaller (was 3)
+      const PS = Math.max(1, Math.round(2.25 * GM.zoomCur * (this.scale || 1)));   // proximity-scaled near worlds (floor 1 so the dive reads at zoom 1)
       if (e.x < -40 || e.x > GM.WV + 40 || e.y < -40 || e.y > GM.WH + 40) return;   // culled
 
       if (this.shield > 0) {
