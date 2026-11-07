@@ -1,6 +1,6 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.39.0';
+  GM.VERSION = '0.40.0';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
@@ -158,7 +158,10 @@
       r: 5, mass: 0.5, accel: 160, turn: 4.0, maxSpeed: 140,
       crew: 6, batt: 20, regen: 5, orbit: 70,
       sprite: 'SHIP:arilou', cap: 'arilou', icon: 'arilou',
-      weapon: { label: 'Auto Gun', kind: 'dart', cd: 0.08, cost: 0.8, speed: 320, dmg: 2, size: 2, life: 0.6, count: 1, spread: 0.03, tol: 0.18, snd: 'laser' },
+      // arilou.c initialize_autoaim_laser: TrackShip steers the beam onto the
+      // nearest enemy within LASER_RANGE — instant hit, no projectile.
+      // WEAPON_COST 2 verbatim; 3 dmg; WEAPON_WAIT 1 = a fast cycling beam
+      weapon: { label: 'Auto-Aim Laser', kind: 'laser', cd: 0.28, cost: 2, dmg: 3, range: 150, snd: 'laser' },
       special: { label: 'Teleport', type: 'blink', cost: 3, cd: 1, range: 260, snd: 'blink' },
     },
     {

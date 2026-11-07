@@ -224,7 +224,11 @@
 
     // ---- gunnery: lead prediction, planet-aware ----
     let fire = false;
-    if (dist < 270 * S && b.los) {
+    if (w.kind === 'laser') {
+      // auto-aim laser (arilou.c initialize_autoaim_laser): the beam finds
+      // its own target — the AI only needs an enemy inside LASER_RANGE
+      fire = dist < w.range * 0.9 && b.los && battFrac > 0.12;
+    } else if (dist < 270 * S && b.los) {
       let t0 = dist / w.speed;
       let aim = null;
       for (let k = 0; k < 3; k++) {

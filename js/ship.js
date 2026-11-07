@@ -42,6 +42,28 @@
       if (C.weaponsprites && C.weaponsprites.androsynth_blazer) {
         for (const uri of C.weaponsprites.androsynth_blazer.f) getSprite(uri);
       }
+      // Arilou Skiff: the melee sprite is a perspective saucer (17x14) —
+      // the ship itself is a PERFECT DISC, so bake one from its own
+      // palette and use it everywhere (ship draw, select, minimap)
+      if (sp.key === 'skiff') {
+        const c = document.createElement('canvas');
+        c.width = 20; c.height = 20;
+        const cg = c.getContext('2d');
+        const disc = (x, y, r, col) => {
+          cg.fillStyle = col;
+          cg.beginPath(); cg.arc(x, y, r, 0, Math.PI * 2); cg.fill();
+        };
+        disc(10, 10, 9.4, '#00202e');     // dark rim
+        disc(10, 10, 8.4, '#2078a8');     // hull
+        disc(10, 10.6, 7.2, '#3f9ad0');   // upper hull
+        disc(10, 8.6, 3.6, '#a8d8f0');    // dome glass
+        disc(10, 8.0, 2.4, '#d0e8f8');    // dome highlight
+        disc(6.2, 11.2, 1.3, '#7cc0e8');  // port light
+        disc(13.8, 11.2, 1.3, '#7cc0e8'); // starboard light
+        const uri = c.toDataURL();
+        sp.sprite = uri;
+        if (!SPRITE_CACHE[uri]) getSprite(uri);
+      }
     }
   }
 
@@ -129,6 +151,27 @@
         const na = va + U.clamp(U.angDiff(va, this.ang), -4 * dt, 4 * dt);
         this.vx = Math.cos(na) * spd;
         this.vy = Math.sin(na) * spd;
+      }
+      if (s.key === 'skiff') {
+        // Skiff doctrine (arilou.c: TURN_WAIT 0, THRUST_INCREMENT == MAX_THRUST):
+        // the saucer handles like the Guardian's comet — the velocity vector
+        // swings to the nose — plus Arilou drag: it STOPS ON A DIME the
+        // moment thrust is released
+        if (this.vx || this.vy) {
+          const spdA = U.len(this.vx, this.vy);
+          const vaA = Math.atan2(this.vy, this.vx);
+          const naA = vaA + U.clamp(U.angDiff(vaA, this.ang), -4 * dt, 4 * dt);
+          this.vx = Math.cos(naA) * spdA;
+          this.vy = Math.sin(naA) * spdA;
+        }
+        if (thrust <= 0) {
+          const vA = U.len(this.vx, this.vy);
+          if (vA > 2) {
+            const kA = Math.min(1, (1100 * dt) / vA);
+            this.vx -= this.vx * kA;
+            this.vy -= this.vy * kA;
+          }
+        }
       }
       // strafe: lateral thrust at 60% power (keeps the nose authoritative)
       if (strafe) {
@@ -254,6 +297,26 @@
       if (this.wcd > 0 || this.dead) return;
       if (this.blazerT > 0) return;   // no firing in comet form (androsyn.c)
       const w = this.spec.forms ? this.spec.forms[this.form].weapon : this.spec.weapon;
+      if (w.kind === 'laser') {
+        // arilou.c initialize_autoaim_laser: TrackShip steers the beam onto
+        // the nearest enemy within LASER_RANGE — instant hit, no projectile;
+        // no lock = no shot and no energy spent
+        let best = null, bd = w.range;
+        for (const s2 of world.ships) {
+          if (s2.dead || s2.team === this.team || s2 === this || s2.spawnProt > 0 || s2.cloakT > 0) continue;
+          const wd = U.wrapDelta(this.x, this.y, s2.x, s2.y);
+          const d = U.len(wd.x, wd.y) - s2.r;
+          if (d < bd) { bd = d; best = s2; }
+        }
+        if (!best) { this.wcd = 0.12; return; }
+        if (this.batt < w.cost) return;
+        this.batt -= w.cost;
+        this.wcd = w.cd;
+        world.pdBeams.push({ x1: this.x, y1: this.y, x2: best.x, y2: best.y, t: 0.12 });
+        best.damage(w.dmg, this, world, 'shot');
+        if (!GM.A.playBuf(this.spec.cap + '_primary', 0.8)) GM.A.SND.laser();
+        return;
+      }
       if (this.batt < w.cost) return;
       this.batt -= w.cost;
       this.wcd = w.cd;
