@@ -677,7 +677,7 @@
       // escape boost: push outward near local escape velocity (capped) so a
       // downed-in-the-well ship doesn't grind on the surface until death
       const escapeV = Math.sqrt(2 * P.GM * (world.surgeMult || 1) / (P.r + this.r));
-      const target = Math.min(escapeV, this.spec.maxSpeed * 1.5, 200);
+      const target = Math.min(escapeV, this.spec.maxSpeed * 1.5, 320);
       const outV = this.vx * nx + this.vy * ny;
       if (outV < target) {
         const add = target - outV;
@@ -685,7 +685,7 @@
       }
       // damage no faster than once per 0.5s (prevents surface-grinding instakill)
       this.crashT = this.crashT || 0;
-      const dmg = Math.max(0, spd - 40) * 0.12;
+      const dmg = Math.max(0, spd - 90) * 0.12;   // v0.47: impacts under 90 u/s are skims, not crashes — the AI safety net climbs out at low speed, so grinding deaths stop
       if (dmg > 0.5 && this.crashT <= 0) {
         this.damage(dmg, null, world, 'crash');
         this.crashT = 0.5;

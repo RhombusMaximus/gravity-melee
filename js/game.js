@@ -121,7 +121,14 @@
       const ship = new GM.Ship(spec, 1, U.pick(GM.PILOTS), U.pick(GM.ARCHETYPES));
       ship.x = U.wrapX(P.x + Math.cos(a) * rr);
       ship.y = U.wrapY(P.y + Math.sin(a) * rr);
-      ship.ang = a + Math.PI;
+      // v0.47: spawn the foe PROGRADE (tangential, orbital velocity) —
+      // aiming straight at the player sent it through the well and 67%
+      // crashed within 4s. The AI closes from orbit instead.
+      const tangA = a + Math.PI / 2;
+      const vOrb = Math.sqrt(P.GM / rr);
+      ship.vx = Math.cos(tangA) * vOrb;
+      ship.vy = Math.sin(tangA) * vOrb;
+      ship.ang = tangA;
       ship.aiBrain = GM.AI.mkBrain();
       if (!this.teams[1]) this.teams[1] = [];
       this.teams[1].push(ship);

@@ -155,6 +155,7 @@
     // planet state
     const pd = U.wrapDelta(s.x, s.y, P.x, P.y);
     const planetDist = U.len(pd.x, pd.y);
+    let brake = false;   // v0.47: deep-well fall arrest
     const planetAhead = planetDist < P.r + 85 * S &&
       Math.abs(U.angDiff(s.ang, U.ang(pd.x, pd.y))) < 1.2;
 
@@ -206,6 +207,46 @@
     if (planetAhead) {
       const av = tangentAvoid(s, pd, planetDist);
       turn = av.turn; thrust = av.thrust;
+    }
+
+    // ---- asteroid avoidance (v0.47): rocks killed 13% of ships — the AI
+    // plowed through the field at full burn. A rock ahead within cone =
+    // jink perpendicular, keep the burn.
+    for (const rock of world.rocks) {
+      const rw = U.wrapDelta(s.x, s.y, rock.x, rock.y);
+      const rd = U.len(rw.x, rw.y);
+      if (rd > rock.r + 90 * S) continue;
+      const rockA = U.ang(rw.x, rw.y);
+      if (Math.abs(U.angDiff(s.ang, rockA)) > 0.9) continue;   // not dead ahead
+      // steer to the tangent around the rock
+      const side = U.angDiff(s.ang, rockA) > 0 ? 1 : -1;
+      const away = rockA + side * Math.PI / 2;
+      turn = U.clamp(U.angDiff(s.ang, away) * 4, -1, 1);
+      break;
+    }
+
+    // ---- planet safety net (v0.47): runs LAST so it wins over combat
+    // modes and the hard tangent-avoid. SIGN: pd here points FROM the
+    // ship TO the planet (wrapDelta(ship, planet)), so rvx > 0 means
+    // falling INWARD. Inside the well radius with inward motion, climb
+    // out along a prograde tangent at full burn; brake first if falling
+    // fast and still turning.
+    const WELL_R = P.r + 200 * S;
+    if (planetDist < WELL_R) {
+      const rvx = (s.vx * pd.x + s.vy * pd.y) / (planetDist || 1);   // >0 = falling in (pd = ship->planet)
+      const deep = planetDist < P.r + 120 * S;
+      if (deep || rvx > 15 * S) {
+        const prograde = U.angDiff(s.ang, U.ang(s.vx, s.vy)) < 0 ? -1 : 1;
+        const tangA = U.ang(pd.x, pd.y) + prograde * Math.PI / 2;
+        const diff = U.angDiff(s.ang, tangA);
+        turn = U.clamp(diff * 4, -1, 1);
+        thrust = 1;
+        brake = false;
+        // falling fast while still turning: kill the fall first — the
+        // brake phase is what drops most would-be impacts under the
+        // 90 u/s skim threshold (removing it tripled the death rate)
+        if (rvx > 45 * S && Math.abs(diff) > 1.1) { thrust = 0; brake = true; }
+      }
     }
 
     // ---- jink (evasion) when enemy is close and shooting ----
@@ -340,6 +381,6 @@
     s.ctrl.turn = turn;
     s.ctrl.thrust = thrust;
     s.ctrl.fire = fire;
-    s.ctrl.brake = false;
+    s.ctrl.brake = !!brake && brake;   // v0.47: deep-well fall arrest
   };
 })(window.GM);
