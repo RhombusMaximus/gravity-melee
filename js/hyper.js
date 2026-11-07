@@ -796,6 +796,23 @@
       }
       g.fillStyle = col;
       g.beginPath(); g.arc(x, y, rad, 0, U.TAU); g.fill();
+      // the ORIGINAL hyperspace "gravity hole" star art: the nav/hyperstars
+      // sprites ride AT each system's map position (the way the original
+      // lines its graphics up with its stars), scaled by size class and
+      // slow-cycling their frames — the colored spectral dot rides the core
+      const hsi = H.hstarImgs;
+      if (hsi && hsi.length) {
+        const cls = st[6] === 3 ? 3 : st[6] === 2 ? 2 : 1;
+        const hsc = cls === 3 ? 3.4 : cls === 2 ? 2.6 : 1.8;
+        const frame = hsi[(i * 7 + Math.floor(t * 6)) % hsi.length];
+        if (frame && frame.complete && frame.naturalWidth > 0) {
+          const hw = frame.naturalWidth * hsc, hh = frame.naturalHeight * hsc;
+          g.globalAlpha = 0.9;
+          g.imageSmoothingEnabled = false;
+          g.drawImage(frame, x - hw / 2, y - hh / 2, hw, hh);
+          g.globalAlpha = 1;
+        }
+      }
       if (i === H.hover && H.hover !== H.sel) {
         g.globalAlpha = 0.9;
         g.strokeStyle = '#fff'; g.lineWidth = 1;
