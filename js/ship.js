@@ -644,6 +644,15 @@
       this.crew -= amt;
       this.hitT = 0.12;
       if (by) this.lastHitBy = by;
+      // v0.52: the Slylandro Probe self-repairs — heals for HALF the
+      // damage it deals (the self-replicating probe harvesting biomass)
+      if (by && by !== this && !by.dead && by.spec.key === 'probe' && by.team !== this.team) {
+        const heal = Math.min(amt * 0.5, by.crewMax - by.crew);
+        if (heal >= 1) {
+          by.crew += heal;
+          GM.FX.float(by.x, by.y - 16, '+' + Math.round(heal), '#9dff7a');
+        }
+      }
       GM.A.SND.hit();
       GM.FX.emit(this.x, this.y, 4, { spd: 70, life: 0.35, col: '#ff8a6a', size: 1.5 });
       GM.A.SND.boom(amt);   // SC2 tiered melee boom by damage amount
@@ -823,19 +832,25 @@
             g.globalAlpha = 1;
           }
         }
-        // Umgah cone zap: draw the cone effect in front of the ship
+        // Umgah cone zap: draw the cone effect in front of the ship —
+        // v0.52: the cone art is a 48-FACING rotational sheet (anchors
+        // orbit the center; frame 0 = north, CCW ~7.5°/frame). Pick the
+        // facing frame for the CURRENT HEADING, no canvas rotation, no
+        // time-cycle — the old 6-frame cycle read as a spinning graphic
         if (this.coneT > 0 && this.spec.weapon.kind === 'cone' && GM.CONTENT.weaponsprites.umgah) {
           const cw = GM.CONTENT.weaponsprites.umgah;
-          const cfi = Math.min(cw.f.length - 1, Math.floor((1 - this.coneT / 0.3) * cw.f.length));
+          const cnt = Math.min(cw.f.length, 48);
+          let cfi = Math.round(((U.TAU - Math.PI / 2 - this.ang) % U.TAU) / (U.TAU / cnt)) % cnt;
+          cfi = ((cfi % cnt) + cnt) % cnt;
           const cimg = getSprite(cw.f[cfi]);
           if (cimg && cimg.complete && cimg.naturalWidth > 0) {
+            const ca = cw.a && cw.a[cfi] ? cw.a[cfi] : [6, 11];
+            const csc = Math.max(3, Math.round(3 * GM.zoomCur));
             g.save();
             g.translate(e.x, e.y);
-            g.rotate(this.ang + Math.PI / 2);
-            const csc = Math.max(3, Math.round(3 * GM.zoomCur));
             g.imageSmoothingEnabled = false;
-            g.globalAlpha = this.coneT / 0.3;
-            g.drawImage(cimg, -6 * csc, -11 * csc, cimg.naturalWidth * csc, cimg.naturalHeight * csc);
+            g.globalAlpha = Math.min(1, this.coneT / 0.3 * 1.5);
+            g.drawImage(cimg, -ca[0] * csc, -ca[1] * csc, cimg.naturalWidth * csc, cimg.naturalHeight * csc);
             g.globalAlpha = 1;
             g.restore();
           }

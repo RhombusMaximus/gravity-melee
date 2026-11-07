@@ -258,22 +258,28 @@
     }
 
     spawnRocks() {
-      // a small asteroid belt per match: 4 big, 2 medium, drifting slowly.
-      // Kept clear of the planet and the ship spawn ring.
+      // v0.52: the asteroid BELT lives on the OUTER RIM of the gravity
+      // well — beyond the moon's orbit (1050) and the ship spawn ring,
+      // inside the containment soft field (3200). Keeps the inner well
+      // clear for combat; the belt is where you run to salvage.
       this.rocks = [];
       const P = GM.PHYS.planet;
       const drop = (size) => {
         for (let tries = 0; tries < 40; tries++) {
           const a = Math.random() * U.TAU;
-          const d = 1100 + Math.random() * 700;
+          const d = 1650 + Math.random() * 1150;
           const x = U.wrapX(P.x + Math.cos(a) * d), y = U.wrapY(P.y + Math.sin(a) * d);
-          if (U.len(x - P.x, y - P.y) < 1000) continue;
+          if (U.len(x - P.x, y - P.y) < 1600) continue;
           let clash = false;
           for (const s of this.ships) if (U.len(x - s.x, y - s.y) < 500) { clash = true; break; }
           if (clash) continue;
-          const ang = Math.random() * U.TAU, spd = 8 + Math.random() * 14;
+          // slow tangential drift so the belt reads as a ring in motion
+          const tang = a + Math.PI / 2;
+          const orb = Math.sqrt(P.GM / d) * 0.45;
+          const jitter = U.rand(-6, 6);
           this.rocks.push({
-            x, y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+            x, y,
+            vx: Math.cos(tang) * (orb + jitter), vy: Math.sin(tang) * (orb + jitter),
             size, hp: ROCK[size].hp, r: ROCK[size].r * (0.85 + Math.random() * 0.3),
             ang: Math.random() * U.TAU, spin: (Math.random() - 0.5) * 0.8,
             seed: Math.floor(Math.random() * 1e9),
@@ -841,9 +847,18 @@
             s.vx -= 1.5 * vn * n.x; s.vy -= 1.5 * vn * n.y;
           }
           if (spd > 40 && (s.rockT || 0) <= 0) {
-            s.damage(Math.max(1, (spd - 40) * 0.1), null, this, 'crash');
-            s.rockT = 0.5;
-            rock.hp -= 2;
+            // v0.52: the Slylandro Probe EATS rocks — salvaging a rock
+            // heals it instead of hurting it (self-replicating probe)
+            if (s.spec.key === 'probe') {
+              s.crew = Math.min(s.crewMax, s.crew + 1 + rock.size * 2);
+              GM.FX.float(s.x, s.y - 16, '+' + (1 + rock.size * 2), '#9dff7a');
+              rock.hp -= 3;
+              s.rockT = 0.5;   // chewing takes a moment — no per-frame feast
+            } else {
+              s.damage(Math.max(1, (spd - 40) * 0.1), null, this, 'crash');
+              s.rockT = 0.5;
+              rock.hp -= 2;
+            }
           }
           if (rock.hp <= 0) { this.breakRock(ri, null); break; }
         }

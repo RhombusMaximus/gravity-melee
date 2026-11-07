@@ -112,7 +112,7 @@ EXTRA_SPRITES = {
 WEAPON_SPRITES = {
     # (shofixti's destruct is a self-destruct explosion, not a weapon projectile)
     'zoqfotpik': ('zoqfotpik', 'spit',     8),   # anti-matter sting
-    'umgah':     ('umgah',     'cone',     6),   # cone zap
+    'umgah':     ('umgah',     'cone',    48),   # cone zap — a 48-FACING rotational sheet (like the blazer), NOT a time animation
     'ilwrath':   ('ilwrath',   'fire',     8),  # twin fusion spray
     'thraddash':    ('thraddash', 'napalm',   8),  # afterburner trail flames
     # the Torch's REAL primary: the Mark VI blaster bolt (horn-big, 16

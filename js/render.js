@@ -8,6 +8,12 @@
   // projectiles (shells, missiles) look like they're spinning when
   // frame cycling stacks on the velocity rotation; show frame 0 only
   const STATIC_WEAPON = { orz: true, human: true, druuge: true, urquan: true };
+  // FACING sheets (v0.52): rotational pre-rotated frame sets like the blazer
+  // sheet — the frame is picked by travel direction and the canvas is NOT
+  // rotated. The Umgah cone (48 facings, ~7.5°/frame CCW from north) and
+  // the Supox glob (6 facings at 60°) were previously time-cycled AND
+  // rotated = a double-rotation that read as a spinning graphic.
+  const FACING_WEAPON = { umgah: 48, supox: 6 };
   R.preloadWeapons = () => {
     const C = GM.CONTENT && GM.CONTENT.weaponsprites;
     if (!C) return;
@@ -289,16 +295,26 @@
       if (e.x < -20 || e.x > GM.WV + 20 || e.y < -20 || e.y > GM.WH + 20) continue;
       const ws = sh.wspr && WS_IMG[sh.wspr];
       if (ws && ws.length && ws[0].complete && ws[0].naturalWidth > 0) {
-        const fi = STATIC_WEAPON[sh.wspr] ? 0 : Math.floor(t * 14) % ws.length;
+        const ang = Math.atan2(sh.vy, sh.vx);
+        let fi, noRot = false;
+        if (FACING_WEAPON[sh.wspr]) {
+          // facing sheet: pick the pre-rotated frame for this direction
+          // (CCW from north: facing_angle(f) = -PI/2 - f * TAU/count)
+          const cnt = FACING_WEAPON[sh.wspr];
+          fi = Math.round(((U.TAU - Math.PI / 2 - ang) % U.TAU) / (U.TAU / cnt)) % cnt;
+          fi = ((fi % cnt) + cnt) % cnt;
+          noRot = true;
+        } else {
+          fi = STATIC_WEAPON[sh.wspr] ? 0 : Math.floor(t * 14) % ws.length;
+        }
         const img = ws[fi];
         if (img && img.complete && img.naturalWidth > 0) {
-          const ang = Math.atan2(sh.vy, sh.vx);
           const psc = Math.max(2, Math.round(2.25 * zs));
           const sw = img.naturalWidth * psc;
           const shh = img.naturalHeight * psc;
           g.save();
           g.translate(e.x, e.y);
-          g.rotate(ang + Math.PI / 2);
+          if (!noRot) g.rotate(ang + Math.PI / 2);
           g.imageSmoothingEnabled = false;
           g.drawImage(img, -sw / 2, -shh / 2, sw, shh);
           g.restore();
