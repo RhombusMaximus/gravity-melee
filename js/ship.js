@@ -37,6 +37,11 @@
       if (C.shipsprites.orz_turret && !SPRITE_CACHE[C.shipsprites.orz_turret]) {
         getSprite(C.shipsprites.orz_turret);
       }
+      // Androsynth blazer facings: preload all 16 so the comet never
+      // misses frames mid-blaze (weaponsprites.androsynth_blazer)
+      if (C.weaponsprites && C.weaponsprites.androsynth_blazer) {
+        for (const uri of C.weaponsprites.androsynth_blazer.f) getSprite(uri);
+      }
     }
   }
 
@@ -570,9 +575,28 @@
 
       // SC2 sprite path: draw the real Star Control II ship art, rotated
       if (this.spec.sprite) {
-        // Androsynth blazer form: the ship becomes a fireball — skip the
-        // normal sprite and draw a radial-gradient comet instead
+        // Androsynth blazer form: the ORIGINAL SC2 energy-comet
+        // (blazer-big-000..015: 16 pre-rotated facings, frame 0 = north,
+        // clockwise; the .ani anchor is the pivot mapped to the ship
+        // center). Falls back to the procedural fireball only if the
+        // frames are missing/undecoded.
         if (this.blazerT > 0) {
+          const bz = GM.CONTENT.weaponsprites && GM.CONTENT.weaponsprites.androsynth_blazer;
+          const fi = bz ? Math.round(((((this.ang + Math.PI / 2) % U.TAU) + U.TAU) % U.TAU) / (U.TAU / 16)) % 16 : -1;
+          const bimg = fi >= 0 ? getSprite(bz.f[fi]) : null;
+          if (bimg && bimg.complete && bimg.naturalWidth > 0) {
+            const ax = bz.a[fi][0], ay = bz.a[fi][1];
+            g.imageSmoothingEnabled = false;
+            g.globalAlpha = 0.82 + 0.18 * Math.sin(t * 28);   // the original's palette-cycle flicker
+            g.drawImage(bimg, e.x - ax * PS, e.y - ay * PS,
+              bimg.naturalWidth * PS, bimg.naturalHeight * PS);
+            g.globalAlpha = 1;
+            // trailing flame particles
+            const back = this.ang + Math.PI;
+            GM.FX.emit(this.x + Math.cos(back) * this.r, this.y + Math.sin(back) * this.r,
+              1, { spd: 30, life: 0.3, col: '#ffb04a', size: 3 });
+            return;   // no normal sprite while blazing
+          }
           const fr = this.r * GM.zoomCur * 2.5;
           const grd = g.createRadialGradient(e.x, e.y, 0, e.x, e.y, fr);
           grd.addColorStop(0, 'rgba(255,255,200,0.9)');

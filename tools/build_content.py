@@ -126,6 +126,9 @@ WEAPON_SPRITES = {
     # non-weapon sprite sets keyed by content name:
     'shofixti_destruct': ('shofixti', 'destruct', 8),   # glory device blast
     'chmmr_sat':         ('chmmr',    'satellite', 8),  # Avatar's orbiting drones
+    # Androsynth Guardian blazer form: the 16 pre-rotated facings of the
+    # energy-comet (blazer-big-000..015, anchors trace the facing circle)
+    'androsynth_blazer': ('androsynth', 'blazer', 16),
 }
 
 # melee explosion animation frames (battle/boom-big-000..003.png)
