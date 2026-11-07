@@ -107,7 +107,11 @@ WEAPON_SPRITES = {
     'zoqfotpik': ('zoqfotpik', 'spit',     8),   # anti-matter sting
     'umgah':     ('umgah',     'cone',     6),   # cone zap
     'ilwrath':   ('ilwrath',   'fire',     8),  # twin fusion spray
-    'thraddash': ('thraddash', 'napalm',   8),  # flame gun
+    'thraddash':    ('thraddash', 'napalm',   8),  # afterburner trail flames
+    # the Torch's REAL primary: the Mark VI blaster bolt (horn-big, 16
+    # directional facings — embed frame 0 = north and let the renderer's
+    # travel-angle rotation aim it; MISSILE_DAMAGE 1, the "weakish bolt")
+    'thraddash_horn': ('thraddash', 'horn', 1),
     'human':     ('human',     'saturn',   6),  # MX missile
     'vux':       ('vux',       'limpets',  4),  # limpet torpedo
     'androsynth':('androsynth','bubble',    3),  # acid bubble

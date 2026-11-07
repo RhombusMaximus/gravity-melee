@@ -718,7 +718,7 @@
     if (me) {
       // special readiness + warnings under the left stack
       const sp = me.spec.special;
-      let ready = me.scd <= 0 && me.batt >= sp.cost;
+      let ready = me.scd <= 0 && me.batt >= Math.max(1, sp.cost);
       let why = '';
       if (sp.type === 'fighters') {
         const airborne = world.fighters.filter((f) => f.by === me).length;

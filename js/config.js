@@ -1,6 +1,6 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.35.0';
+  GM.VERSION = '0.36.0';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
@@ -100,8 +100,12 @@
       r: 6, mass: 1.5, accel: 130, turn: 3.0, maxSpeed: 115,
       crew: 8, batt: 24, regen: 5, orbit: 70,
       sprite: 'SHIP:thraddash', cap: 'thraddash', icon: 'thraddash',
-      weapon: { label: 'Flame Gun', kind: 'shot', cd: 0.2, cost: 2, speed: 170, dmg: 1, size: 2, life: 0.55, count: 1, spread: 0.06, tol: 0.25, snd: 'shot' },
-      special: { label: 'Afterburner', type: 'afterburner', cost: 1, cd: 0, drain: 5 },
+      weapon: { label: 'Mark VI Blaster', kind: 'shot', cd: 0.2, cost: 2, speed: 170, dmg: 1, size: 2, life: 0.55, count: 1, spread: 0.06, tol: 0.25, snd: 'shot', wspr: 'thraddash_horn' },
+      // hold-to-fire: burns 12/s while Shift is held — the original drains
+      // energy every activation frame; 12/s nets -7/s against the 5/s regen
+      // so the burn is visible and finite (thradd.c: SPECIAL_ENERGY_COST per
+      // activation frame, SPECIAL_WAIT 0)
+      special: { label: 'Afterburner', type: 'afterburner', cost: 0, cd: 0, drain: 12 },
     },
     {
       // EC-18 Cruiser — the Earthling workhorse (human.c: 18 crew, 18
@@ -143,7 +147,10 @@
       crew: 20, batt: 24, regen: 4, orbit: 70,
       sprite: 'SHIP:androsynth', cap: 'androsynth', icon: 'androsynth',
       weapon: { label: 'Acid Bubbles', kind: 'lob', cd: 0.3, cost: 3, speed: 120, dmg: 2, size: 3, life: 2.2, count: 1, spread: 0, tol: 0.2, snd: 'lob' },
-      special: { label: 'Blazer Form', type: 'blazer', cost: 2, cd: 1, dur: 3.5 },
+      // hold-to-fire comet form: energy burns 8/s while Shift is held —
+      // nets -4/s against the 4/s regen, so the comet form is finite
+      // (androsyn.c: SPECIAL_ENERGY_COST 2 per activation frame)
+      special: { label: 'Blazer Form', type: 'blazer', cost: 0, cd: 0, dur: 3.5, drain: 8 },
     },
     {
       // AR-6 Skiff — the Arilou teleporting saucer (arilou.c stats).

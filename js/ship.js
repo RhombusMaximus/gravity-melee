@@ -87,6 +87,11 @@
       const turn = want.turn || 0;
       const strafe = want.strafe || 0;   // Q/E lateral thrust
 
+      // hold-to-fire specials (afterburner, blazer): releasing the key
+      // ends the form — energy burns over time while it is held
+      if (this.burnActive && !want.special) { this.burnActive = false; this.burn = 0; }
+      if (this.blazerT > 0 && !want.special) this.blazerT = 0;
+
       // VUX limpets: glued limpets drag the hull (turn + thrust)
       const slowK = this.slowT > 0 ? 0.55 : 1;
       this.slowT = Math.max(0, this.slowT - dt);
@@ -144,7 +149,7 @@
       const v = U.len(this.vx, this.vy);
       if (this.blazerT > 0) {
         // Blazer comet form: invulnerable, overthrust, burns battery
-        this.batt -= 3 * dt;
+        this.batt -= (s.special.drain || 3) * dt;
         if (this.batt <= 0) { this.blazerT = 0; this.batt = 0; }
       }
       // the afterburning Torch is the fastest thing in the sky (thradd.c:
@@ -167,7 +172,7 @@
       if (this.burnActive) {
         this.batt -= s.special.drain * dt;
         this.burn += dt;
-        if (this.batt <= 0 || this.burn > 1.6) { this.burn = 0; this.burnActive = false; }
+        if (this.batt <= 0) { this.burn = 0; this.burnActive = false; this.batt = 0; }
       }
     }
 
@@ -247,6 +252,7 @@
 
     fire(world) {
       if (this.wcd > 0 || this.dead) return;
+      if (this.blazerT > 0) return;   // no firing in comet form (androsyn.c)
       const w = this.spec.forms ? this.spec.forms[this.form].weapon : this.spec.weapon;
       if (this.batt < w.cost) return;
       this.batt -= w.cost;
@@ -386,8 +392,9 @@
           break;
         }
         case 'blazer': {
-          this.blazerT = sp.dur;
-          GM.A.SND.burn();
+          // hold-to-fire comet form: on while Shift is held, energy burns
+          // 3/s, and the form cannot fire its weapon (androsyn.c)
+          if (this.blazerT <= 0) { this.blazerT = sp.dur; GM.A.SND.burn(); }
           break;
         }
         case 'pointdef': {
@@ -429,8 +436,9 @@
           break;
         }
         case 'afterburner':
-          this.burnActive = true; this.burn = 0;
-          GM.A.SND.burn();
+          // hold-to-fire: useSpecial runs every frame the key is held —
+          // edge-trigger the sound, keep the form on while held
+          if (!this.burnActive) { this.burnActive = true; this.burn = 0; GM.A.SND.burn(); }
           break;
         case 'shield':
           this.shield = sp.dur;
