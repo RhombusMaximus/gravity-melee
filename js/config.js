@@ -1,6 +1,6 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.34.0';
+  GM.VERSION = '0.35.0';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
@@ -355,9 +355,9 @@
 
   GM.MODES = [
     // budget: point cap per TEAM (Super Melee style) — every slot must fit.
+    // (3v3v3 removed v0.35 — the slot may become multiplayer later)
     { key: '1', label: '1 v 1',       teams: [1, 1],       budget: 30 },
     { key: '2', label: '2 v 2',       teams: [2, 2],       budget: 50 },
-    { key: '3', label: '3 v 3 v 3',   teams: [3, 3, 3],    budget: 66 },
     { key: '5', label: 'SURVIVAL',    teams: [1, 0],       budget: 30 },
   ];
 

@@ -700,10 +700,23 @@
     const me = (held && !held.dead) ? held : ((world.p1 && !world.p1.dead) ? world.p1 : null);
     const lockedBy = (held && !held.dead) ? world.lockedOnMe(held) : [];
 
-    // ===== YOUR SHIP PANEL (upper left) — the original SC2 status panel =====
+    // ===== PILOT CARDS — team 0 stacked on the LEFT (up to 3) =====
+    const CARD_H = 112;
+    const t0 = world.teams[0] || [];
+    t0.forEach((s, i) => {
+      const cy = 6 + i * CARD_H;
+      if (s.dead) g.globalAlpha = 0.45;
+      drawStatusPanel(g, s, 6, cy);
+      g.globalAlpha = 1;
+      if (s === held && !s.dead) {
+        g.strokeStyle = '#7fd4ff';
+        g.lineWidth = 1.5;
+        g.strokeRect(4, cy - 2, 68, 106);
+        g.lineWidth = 1;
+      }
+    });
     if (me) {
-      drawStatusPanel(g, me, 6, 6);
-      // special readiness + warnings under the panel
+      // special readiness + warnings under the left stack
       const sp = me.spec.special;
       let ready = me.scd <= 0 && me.batt >= sp.cost;
       let why = '';
@@ -715,30 +728,28 @@
       g.font = 'bold 8px monospace';
       g.textAlign = 'left';
       g.fillStyle = ready ? '#8ef2ff' : '#5a6478';
-      g.fillText('SP ' + sp.label + (ready ? ' [READY]' : why), 8, 120);
+      g.fillText('SP ' + sp.label + (ready ? ' [READY]' : why), 8, 6 + t0.length * CARD_H + 10);
       if (lockedBy.length) {
         const pulse = 0.65 + 0.35 * Math.sin((GM.clockT || 0) * 5);
         g.globalAlpha = pulse;
         g.fillStyle = '#ffb04a';
-        g.fillText('⚠ LOCKED ×' + lockedBy.length, 8, 132);
+        g.fillText('⚠ LOCKED ×' + lockedBy.length, 8, 6 + t0.length * CARD_H + 22);
         g.globalAlpha = 1;
       }
-      if (!held) {
-        g.fillStyle = '#7fd4ff';
-        g.fillText('[F] take the helm', 8, GM.VH - 8);
-      }
-    } else {
+    }
+    if (!held) {
       g.font = 'bold 8px monospace';
       g.textAlign = 'left';
       g.fillStyle = '#7fd4ff';
       g.fillText('[F] take the helm', 8, GM.VH - 8);
     }
 
-    // ===== TARGET PANEL (upper right) — auto-shows the current enemy =====
+    // ===== PILOT CARDS — team 1 stacked on the RIGHT (up to 3) =====
+    const t1 = world.teams[1] || [];
     let tgt = GM.humanTarget;
     if ((!tgt || tgt.dead) && world.ships) {
       // no manual target: auto-acquire the first living hostile so the
-      // enemy captain window + crew dots are always visible on the right
+      // enemy captain windows + crew dots are always visible on the right
       const meTeam = me ? me.team : 0;
       for (const s of world.ships) {
         if (s.dead || s.team === meTeam) continue;
@@ -746,17 +757,26 @@
         break;
       }
     }
-    if (tgt && !tgt.dead && tgt !== me) {
-      drawStatusPanel(g, tgt, GM.VW - 70, 6);
-      if (me) {
-        const w = U.wrapDelta(me.x, me.y, tgt.x, tgt.y);
-        const dist = U.len(w.x, w.y);
-        const closing = -(w.x * tgt.vx + w.y * tgt.vy) / (dist || 1);
-        g.font = 'bold 8px monospace';
-        g.textAlign = 'right';
-        g.fillStyle = '#8fa2c0';
-        g.fillText('RNG ' + Math.round(dist) + '  CLOSING ' + closing.toFixed(1), GM.VW - 8, 120);
+    t1.forEach((s, i) => {
+      const cy = 6 + i * CARD_H;
+      if (s.dead) g.globalAlpha = 0.45;
+      drawStatusPanel(g, s, GM.VW - 70, cy);
+      g.globalAlpha = 1;
+      if (s === tgt && !s.dead) {
+        g.strokeStyle = '#ffb04a';
+        g.lineWidth = 1.5;
+        g.strokeRect(GM.VW - 72, cy - 2, 68, 106);
+        g.lineWidth = 1;
       }
+    });
+    if (tgt && !tgt.dead && tgt !== me && me) {
+      const w = U.wrapDelta(me.x, me.y, tgt.x, tgt.y);
+      const dist = U.len(w.x, w.y);
+      const closing = -(w.x * tgt.vx + w.y * tgt.vy) / (dist || 1);
+      g.font = 'bold 8px monospace';
+      g.textAlign = 'right';
+      g.fillStyle = '#8fa2c0';
+      g.fillText('RNG ' + Math.round(dist) + '  CLOSING ' + closing.toFixed(1), GM.VW - 8, 6 + t1.length * CARD_H + 10);
     }
 
     // ===== TEAM ROSTER (bottom left) =====
@@ -948,7 +968,7 @@
     }
     g.font = '8px monospace';
     g.fillStyle = '#55688a';
-    g.fillText('[1] 1v1 · 30 pts    [2] 2v2 · 50 pts    [3] 3v3v3 · 66 pts', GM.VW / 2, 168);
+    g.fillText('[1] 1v1 · 30 pts    [2] 2v2 · 50 pts', GM.VW / 2, 168);
     g.fillText('[4] HYPERSPACE — the 3D star map    [5] SURVIVAL    [O] SOUNDTRACK', GM.VW / 2, 182);
     g.fillText('F take helm (your team) · WASD fly · Q/E strafe · SPACE fire · SHIFT special', GM.VW / 2, 196);
     g.fillText('TAB cycle targets · X release helm · C wingmen focus fire · G minds · P pause · M mute · [ ] volume', GM.VW / 2, 210);
