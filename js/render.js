@@ -871,47 +871,109 @@
 
   // ---------- minimap ----------
   R.drawMinimap = (g, world) => {
-    const mw = 80, mh = 80;   // square minimap for the square arena
-    const mx = (GM.VW - mw) / 2, my = GM.VH - mh - 10;   // bottom center (v0.43)
-    g.fillStyle = 'rgba(4,6,12,0.72)';
-    g.fillRect(mx, my, mw, mh);
-    g.strokeStyle = '#1b2438';
-    g.strokeRect(mx, my, mw, mh);
-    const sx = mw / GM.W, sy = mh / GM.H;
+    // v0.48: ROUND radar — the arena is a containment disc, so the radar is
+    // one too. Center = the planet, rim = the containment boundary; ships
+    // beyond the rim clamp to the edge (a blip pinned to the ring).
+    const RAD = 40;
+    const cx = GM.VW / 2, cy = GM.VH - RAD - 12;
     const P = GM.PHYS.planet;
+    const M = GM.PHYS.moon;
+    const k = RAD / GM.PHYS.arenaR;
+
+    // clip everything to the disc
+    g.save();
+    g.beginPath();
+    g.arc(cx, cy, RAD, 0, U.TAU);
+    g.clip();
+
+    // background: subtle radial gradient (scan-glass feel)
+    const grd = g.createRadialGradient(cx, cy, 2, cx, cy, RAD);
+    grd.addColorStop(0, 'rgba(10,16,30,0.82)');
+    grd.addColorStop(1, 'rgba(4,6,12,0.82)');
+    g.fillStyle = grd;
+    g.fillRect(cx - RAD, cy - RAD, RAD * 2, RAD * 2);
+
+    // range rings: spawn ring + moon orbit, faint
+    g.strokeStyle = '#22304a';
+    g.lineWidth = 0.5;
+    g.globalAlpha = 0.7;
+    g.beginPath(); g.arc(cx, cy, GM.PHYS.spawnR * k, 0, U.TAU); g.stroke();
+    g.beginPath(); g.arc(cx, cy, M.orbitR * k, 0, U.TAU); g.stroke();
+    // crosshair ticks
+    g.globalAlpha = 0.35;
+    g.beginPath();
+    g.moveTo(cx - RAD, cy); g.lineTo(cx - RAD + 6, cy);
+    g.moveTo(cx + RAD - 6, cy); g.lineTo(cx + RAD, cy);
+    g.moveTo(cx, cy - RAD); g.lineTo(cx, cy - RAD + 6);
+    g.moveTo(cx, cy + RAD - 6); g.lineTo(cx, cy + RAD);
+    g.stroke();
+    g.globalAlpha = 1;
+    g.lineWidth = 1;
+
+    // the planet (center dot)
     g.fillStyle = '#b07a48';
-    g.fillRect(mx + P.x * sx - 1, my + P.y * sy - 1, 3, 3);
+    g.beginPath(); g.arc(cx, cy, 2.2, 0, U.TAU); g.fill();
+    // the moon
     const mp = world.moonPos();
+    const mdx = U.wrapDelta(P.x, P.y, mp.x, mp.y);
     g.fillStyle = '#8b95ab';
-    g.fillRect(mx + mp.x * sx, my + mp.y * sy, 1, 1);
-    for (const s of world.ships) {
-      if (s.dead) continue;
-      g.fillStyle = s.human ? '#fff' : GM.TEAMS[s.team].P;
-      const px = mx + s.x * sx, py = my + s.y * sy;
-      g.fillRect(px - 1, py - 1, s.human ? 3 : 2, s.human ? 3 : 2);
-    }
-    for (const f of world.fighters) {
-      if (f.dead) continue;
-      g.fillStyle = GM.TEAMS[f.team].P;
-      g.fillRect(mx + f.x * sx, my + f.y * sy, 1, 1);
-    }
-    const tgt = GM.humanTarget;
-    if (tgt && !tgt.dead) {
-      g.strokeStyle = GM.TEAMS[tgt.team].P;
-      g.globalAlpha = 0.6;
-      g.beginPath();
-      g.arc(mx + tgt.x * sx, my + tgt.y * sy, 3, 0, U.TAU);
-      g.stroke();
-      g.globalAlpha = 1;
-    }
+    g.beginPath(); g.arc(cx + mdx.x * k, cy + mdx.y * k, 1.2, 0, U.TAU); g.fill();
+
+    // camera view box (what the world canvas shows)
     const me = GM.humanShip;
     if (me && !me.dead) {
       g.strokeStyle = '#3fc8ff';
-      g.globalAlpha = 0.4;
+      g.globalAlpha = 0.35;
       const zs = GM.zoomCur;
-      g.strokeRect(mx + (me.x - GM.WV / 2 / zs) * sx, my + (me.y - GM.WH / 2 / zs) * sy, GM.WV / zs * sx, GM.WH / zs * sy);
+      const vw = GM.WV / zs * k, vh = GM.WH / zs * k;
+      const vx = U.wrapDelta(P.x, P.y, me.x, me.y);
+      g.strokeRect(cx + vx.x * k - vw / 2, cy + vx.y * k - vh / 2, vw, vh);
       g.globalAlpha = 1;
     }
+
+    // ships + fighters: clamp to the rim when outside the disc
+    const blip = (wx, wy) => {
+      const w = U.wrapDelta(P.x, P.y, wx, wy);
+      let d = U.len(w.x, w.y);
+      if (d > GM.PHYS.arenaR) {
+        const n = U.norm(w.x, w.y);
+        return { x: cx + n.x * (RAD - 2), y: cy + n.y * (RAD - 2), rim: true };
+      }
+      return { x: cx + w.x * k, y: cy + w.y * k, rim: false };
+    };
+    for (const s of world.ships) {
+      if (s.dead) continue;
+      const b = blip(s.x, s.y);
+      g.fillStyle = s.human ? '#fff' : GM.TEAMS[s.team].P;
+      const r = s.human ? 1.6 : 1.2;
+      g.beginPath(); g.arc(b.x, b.y, r, 0, U.TAU); g.fill();
+    }
+    for (const f of world.fighters) {
+      if (f.dead) continue;
+      const b = blip(f.x, f.y);
+      g.fillStyle = GM.TEAMS[f.team].P;
+      g.fillRect(b.x - 0.5, b.y - 0.5, 1, 1);
+    }
+    const tgt = GM.humanTarget;
+    if (tgt && !tgt.dead) {
+      const b = blip(tgt.x, tgt.y);
+      g.strokeStyle = GM.TEAMS[tgt.team].P;
+      g.globalAlpha = 0.75;
+      g.beginPath(); g.arc(b.x, b.y, 3.5, 0, U.TAU); g.stroke();
+      g.globalAlpha = 1;
+    }
+
+    g.restore();   // end clip
+
+    // rim ring (the containment boundary) + faint outer glow
+    g.strokeStyle = '#2a3a5c';
+    g.lineWidth = 1.5;
+    g.beginPath(); g.arc(cx, cy, RAD, 0, U.TAU); g.stroke();
+    g.globalAlpha = 0.25;
+    g.lineWidth = 3.5;
+    g.beginPath(); g.arc(cx, cy, RAD + 1.5, 0, U.TAU); g.stroke();
+    g.globalAlpha = 1;
+    g.lineWidth = 1;
   };
 
   // ---------- screens ----------
