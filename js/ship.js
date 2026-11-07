@@ -385,6 +385,42 @@
       }
       const n = w.count || 1;
       this.totalShots += n;
+      // v0.50: the Precursor's twin front cannons TRACK — both mounts fire
+      // at the nearest target within a cone of the nose (no lock = straight
+      // ahead), from offset port/starboard firing points
+      if (w.twinTrack) {
+        let best = null, bd = 1e9;
+        for (const s2 of world.ships) {
+          if (s2.dead || s2.team === this.team || s2 === this || s2.spawnProt > 0 || s2.cloakT > 0) continue;
+          const wd = U.wrapDelta(this.x, this.y, s2.x, s2.y);
+          const d = U.len(wd.x, wd.y);
+          if (d < bd) { bd = d; best = { x: s2.x, y: s2.y }; }
+        }
+        let aim = this.ang;
+        if (best) {
+          const wd = U.wrapDelta(this.x, this.y, best.x, best.y);
+          const want = U.ang(wd.x, wd.y);
+          aim = this.ang + U.clamp(U.angDiff(this.ang, want), -0.6, 0.6);
+        }
+        for (let i = 0; i < 2; i++) {
+          const side = i === 0 ? -1 : 1;
+          const px2 = this.x + Math.cos(this.ang) * this.r * 0.7 + Math.cos(this.ang + Math.PI / 2) * side * this.r * 0.5;
+          const py2 = this.y + Math.sin(this.ang) * this.r * 0.7 + Math.sin(this.ang + Math.PI / 2) * side * this.r * 0.5;
+          world.shots.push({
+            x: px2, y: py2,
+            vx: this.vx * 0.35 + Math.cos(aim) * w.speed,
+            vy: this.vy * 0.35 + Math.sin(aim) * w.speed,
+            life: w.life, team: this.team, dmg: w.dmg, size: w.size,
+            kind: w.kind, aoe: w.aoe || 0, by: this, wspr: w.wspr || this.spec.cap,
+            col: '#ffd070', grav: 0.3, turn: 0, tgt: null, retgtT: 0,
+          });
+        }
+        this.totalShots += 1;
+        const cap = this.spec.cap;
+        const sndKey = cap + '_primary';
+        if (!cap || !GM.A.playBuf(sndKey, 0.5)) GM.A.SND[w.snd]();
+        return;
+      }
       for (let i = 0; i < n; i++) {
         const off = n === 1 ? 0 : (i - (n - 1) / 2) * w.spread * 2.2;
         const aim = this.spec.turret ? this.ang + this.turretOff : this.ang;

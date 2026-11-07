@@ -1,6 +1,6 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.49.0';
+  GM.VERSION = '0.50.0';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
@@ -342,10 +342,12 @@
       // Special: a point-defense array — fitting for a capital ship.
       key: 'flagship', name: 'Precursor Vessel', role: 'flagship', cost: 66,
       r: 16, mass: 4.8, accel: 60, turn: 1.1, maxSpeed: 68, sprScale: 2,
-      crew: 60, batt: 60, regen: 3, orbit: 130,
+      crew: 200, batt: 200, regen: 4, orbit: 130,
       sprite: 'SHIP:flagship', cap: 'flagship', icon: 'flagship',
-      weapon: { label: 'Auto-Blaster Array', kind: 'bolt', cd: 0.22, cost: 2.5, speed: 340, dmg: 4, size: 4, life: 0.8, count: 1, spread: 0.04, tol: 0.18, wspr: 'flagship_blaster', snd: 'bolt' },
-      special: { label: 'Point-Defense Grid', type: 'pointdef', cost: 5, cd: 4, dur: 3, rad: 170 },
+      // v0.50 mid-game armaments: TWIN front cannons that auto-track the
+      // nearest target within a cone of the nose (ship.js fire() twinTrack)
+      weapon: { label: 'Twin Tracking Cannons', kind: 'bolt', cd: 0.22, cost: 2.5, speed: 340, dmg: 4, size: 4, life: 0.8, count: 1, spread: 0.04, tol: 0.18, twinTrack: true, wspr: 'flagship_blaster', snd: 'bolt' },
+      special: { label: 'Point-Defense Lasers', type: 'pointdef', cost: 2, cd: 3, dur: 4, rad: 190 },
     },
   ];
 

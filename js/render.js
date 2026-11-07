@@ -671,7 +671,12 @@
 
   // two staggered columns of 2x1 blocks, bottom up (DeltaStatistics layout)
   function drawGaugeDots(g, x, yBottom, count, max, colr) {
-    const rows = Math.max(1, Math.ceil(max / 2));
+    // v0.50: big ships (the 200-crew Precursor) scale their dots — each
+    // dot = `per` units so the gauge fits the original 64x102 panel
+    const per = max > 60 ? Math.ceil(max / 40) : 1;
+    const dmax = Math.ceil(max / per);
+    count = Math.ceil(count / per);
+    const rows = Math.max(1, Math.ceil(dmax / 2));
     const H = rows * 2 + 1;
     const top = yBottom - H;
     g.fillStyle = '#000';
@@ -728,7 +733,8 @@
     g.font = '6px monospace';
     g.fillStyle = '#000';
     g.fillText(s.name, px + 32, py + 58);
-    g.fillText('CREW', px + 13, py + 63);
+    // v0.50: scaled gauges (the 200-crew Precursor) show live numbers
+    g.fillText(s.crewMax > 60 ? 'CREW ' + Math.ceil(s.crew) : 'CREW', px + 13, py + 63);
     g.fillStyle = s.batt / s.battMax < 0.2 ? LOW_FUEL : '#000';
     g.fillText('BATT', px + 50, py + 63);
     // captain window: idle frame + input-reactive overlays (CaptainsWindow)
