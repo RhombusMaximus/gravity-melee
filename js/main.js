@@ -243,6 +243,10 @@
   // Super Melee style: every ship has a point cost; your team must fit the
   // mode's budget. Unpicked slots (and enemy teams) auto-fill under it.
   function affordable(sel, slotIdx, shipIdx) {
+    // v0.53: in survival the budget governs the ENEMY waves, not the
+    // player — the player's single pick is free (including the 66-pt
+    // Precursor Vessel)
+    if (sel.mode.key === '5') return true;
     let sum = 0;
     sel.idx.forEach((j, k) => { if (k !== slotIdx && j >= 0) sum += GM.SHIPS[j].cost; });
     return sum + GM.SHIPS[shipIdx].cost <= sel.mode.budget;

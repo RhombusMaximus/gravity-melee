@@ -111,7 +111,9 @@
     // ---- survival mode: endless waves of escalating enemies ----
     spawnSurvivalEnemy() {
       const P = GM.PHYS.planet;
-      const affordable = GM.SHIPS.filter((s) => s.cost <= this.survivalCost);
+      // v0.53: the Precursor Vessel never spawns as a survival enemy —
+      // the player's flagship pick is a special case, not a wave threat
+      const affordable = GM.SHIPS.filter((s) => s.cost <= this.survivalCost && s.key !== 'flagship');
       const pool = affordable.length ? affordable : GM.SHIPS;
       const spec = U.pick(pool);
       // spawn on the ring, opposite the player's current position
