@@ -63,7 +63,8 @@
           if (key) spec = GM.SHIPS.find((s) => s.key === key) || null;
           if (!spec) {
             const afford = GM.SHIPS.filter((s) => s.cost <= budget - spent);
-            spec = afford.length ? U.pick(afford) : GM.SHIPS[0];
+            if (!afford.length) continue;   // budget exhausted — empty slot, never a free SHIPS[0] (v0.49: the 66-pt flagship makes this reachable)
+            spec = U.pick(afford);
           }
           spent += spec.cost;
           const arch = U.pick(GM.ARCHETYPES);

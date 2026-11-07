@@ -1145,7 +1145,7 @@
     R.dim(g, 0.72);
     const mode = sel.mode;
     const budget = mode.budget;
-    const spent = sel.idx.reduce((a, j) => a + GM.SHIPS[j].cost, 0);
+    const spent = sel.idx.reduce((a, j) => a + (j >= 0 ? GM.SHIPS[j].cost : 0), 0);
 
     g.textAlign = 'center';
     g.font = 'bold 16px monospace';
@@ -1169,7 +1169,8 @@
     for (let i = 0; i < sel.idx.length; i++) {
       const y = 94 + i * 58;
       const cur = i === sel.cur;
-      const spec = GM.SHIPS[sel.idx[i]];
+      const empty = sel.idx[i] < 0;
+      const spec = empty ? null : GM.SHIPS[sel.idx[i]];
       if (cur) {
         g.strokeStyle = '#7fd4ff';
         g.globalAlpha = 0.55 + 0.35 * Math.sin(t * 6);
@@ -1179,6 +1180,17 @@
       }
       g.strokeRect(56, y - 16, GM.VW - 112, 52);
       g.globalAlpha = 1;
+
+      if (empty) {
+        g.textAlign = 'left';
+        g.font = 'bold 9px monospace';
+        g.fillStyle = '#445068';
+        g.fillText('— EMPTY SLOT —', 122, y - 2);
+        g.font = '8px monospace';
+        g.fillText('A/D to pick a ship', 122, y + 10);
+        g.textAlign = 'center';
+        continue;
+      }
 
       drawSprite(g, spec, 92, y + 10, 2, 0);
 
@@ -1193,7 +1205,7 @@
       g.textAlign = 'right';
       g.font = 'bold 11px monospace';
       let others = 0;
-      sel.idx.forEach((j, k) => { if (k !== i) others += GM.SHIPS[j].cost; });
+      sel.idx.forEach((j, k) => { if (k !== i && j >= 0) others += GM.SHIPS[j].cost; });
       g.fillStyle = (others + spec.cost > budget) ? '#ff5648' : '#ffd85e';
       g.fillText(spec.cost + ' PTS', GM.VW - 68, y + 8);
       g.textAlign = 'center';
@@ -1202,7 +1214,7 @@
     // roster reference line
     g.font = '8px monospace';
     g.fillStyle = '#55688a';
-    g.fillText(GM.SHIPS.length + ' SC2 SHIPS · 5–30 PTS · ' + (mode.key === '5' ? 'PICK YOUR FIGHTER' : 'FULL SUPER MELEE ROSTER'), GM.VW / 2, GM.VH - 40);
+    g.fillText(GM.SHIPS.length + ' SC2 SHIPS + PRECURSOR · 5–66 PTS · ' + (mode.key === '5' ? 'PICK YOUR FIGHTER' : 'FULL ROSTER'), GM.VW / 2, GM.VH - 40);
 
     const blink = Math.sin(t * 3) > -0.3;
     if (blink) {

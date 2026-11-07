@@ -76,6 +76,7 @@ CAPTAIN_SETS = {
     'shofixti': 'scout', 'supox': 'blade', 'syreen': 'penetrator',
     'thraddash': 'torch', 'utwig': 'jugger', 'vux': 'intruder',
     'zoqfotpik': 'stinger',
+    'flagship': 'flagship',   # the Precursor Vessel captain window (v0.49)
 }
 
 # extra per-ship sounds beyond primary/secondary (keyed <species>_<name>)
@@ -133,7 +134,9 @@ WEAPON_SPRITES = {
     'kohrah':    ('kohrah',    'gas',       8),  # F.R.I.E.D.
     'urquan':    ('urquan',    'fusion',    8),  # fusion bolt
     'melnorme':  ('melnorme',  'pumpup',    6),  # charged orb
-    # non-weapon sprite sets keyed by content name:
+    # the Precursor capital ship's own weapon: the flagship blaster bolts
+    # (ships/flagship/blaster-big, 27 frames per the .ani)
+    'flagship_blaster': ('flagship', 'blaster', 27),
     'shofixti_destruct': ('shofixti', 'destruct', 8),   # glory device blast
     'chmmr_sat':         ('chmmr',    'satellite', 8),  # Avatar's orbiting drones
     # Androsynth Guardian blazer form: the 16 pre-rotated facings of the
@@ -381,7 +384,10 @@ def main():
             parts.append(f"          'data:image/png;base64,{b64}',\n")
         parts.append('        ],\n')
         parts.append('        a: [' + ', '.join(f'[{ax},{ay}]' for _, ax, ay in frames) + '],\n')
-        raw = git_show(repo, ref, f'{base}/ships/{sp}/{name}-icons-001.png')
+        try:
+            raw = git_show(repo, ref, f'{base}/ships/{sp}/{name}-icons-001.png')
+        except SystemExit:
+            raw = git_show(repo, ref, f'{base}/ships/{sp}/{name}-icons-000.png')  # flagship uses -000
         b64 = base64.b64encode(raw).decode()
         parts.append(f"        i: 'data:image/png;base64,{b64}',\n")
         parts.append('      },\n')
@@ -483,7 +489,10 @@ def main():
                 raw = git_show(repo, ref, f'{base}/ships/{sp}/{flds[0]}')
                 with open(os.path.join(cdir, flds[0]), 'wb') as f:
                     f.write(raw)
-        raw = git_show(repo, ref, f'{base}/ships/{sp}/{name}-icons-001.png')
+        try:
+            raw = git_show(repo, ref, f'{base}/ships/{sp}/{name}-icons-001.png')
+        except SystemExit:
+            raw = git_show(repo, ref, f'{base}/ships/{sp}/{name}-icons-000.png')  # flagship
         with open(os.path.join(cdir, f'{name}-icons-001.png'), 'wb') as f:
             f.write(raw)
     # lander content raw export (assets/lander/) for provenance + inspection

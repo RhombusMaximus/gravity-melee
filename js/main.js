@@ -244,24 +244,36 @@
   // mode's budget. Unpicked slots (and enemy teams) auto-fill under it.
   function affordable(sel, slotIdx, shipIdx) {
     let sum = 0;
-    sel.idx.forEach((j, k) => { if (k !== slotIdx) sum += GM.SHIPS[j].cost; });
+    sel.idx.forEach((j, k) => { if (k !== slotIdx && j >= 0) sum += GM.SHIPS[j].cost; });
     return sum + GM.SHIPS[shipIdx].cost <= sel.mode.budget;
   }
 
   function cycleSlot(sel, dir) {
     const n = GM.SHIPS.length;
-    let j = sel.idx[sel.cur];
+    let j = sel.idx[sel.cur] < 0 ? 0 : sel.idx[sel.cur];
     for (let step = 0; step < n; step++) {
       j = (j + dir + n) % n;
-      if (affordable(sel, sel.cur, j)) { sel.idx[sel.cur] = j; GM.A.SND.ui(); return; }
+      if (affordable(sel, sel.cur, j)) {
+        sel.idx[sel.cur] = j;
+        // v0.49: a full-budget ship (the 66-pt Precursor) clears the other
+        // slots — it flies alone
+        if (GM.SHIPS[j].cost >= sel.mode.budget) {
+          sel.idx.forEach((_, k) => { if (k !== sel.cur) sel.idx[k] = -1; });
+        }
+        GM.A.SND.ui();
+        return;
+      }
     }
   }
 
   function randomLoadout(sel) {
     for (let k = 0; k < sel.idx.length; k++) {
       const afford = [];
-      GM.SHIPS.forEach((s, j) => { if (affordable(sel, k, j)) afford.push(j); });
+      GM.SHIPS.forEach((s, j) => {
+        if (affordable(sel, k, j)) afford.push(j);
+      });
       if (afford.length) sel.idx[k] = U.pick(afford);
+      else sel.idx[k] = -1;   // budget exhausted (e.g. a Precursor took it all)
     }
   }
 
@@ -280,7 +292,7 @@
 
   function deploySelection() {
     const sel = GM.sel;
-    const picks = [sel.idx.map((j) => GM.SHIPS[j].key)];
+    const picks = [sel.idx.filter((j) => j >= 0).map((j) => GM.SHIPS[j].key)];
     startGame(sel.mode, picks);
     GM.sel = null;
   }

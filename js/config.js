@@ -1,6 +1,6 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.48.0';
+  GM.VERSION = '0.49.0';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
@@ -310,9 +310,9 @@
       weapon: { label: 'Photon Crystal', kind: 'plasma', cd: 1.3, cost: 5, speed: 150, dmg: 6, size: 6, life: 2.4, count: 1, spread: 0, tol: 0.17, aoe: 30, snd: 'plasma' },
       special: { label: 'DOGI Crystals', type: 'missile', cost: 20, cd: 2.5, speed: 110, dmg: 3, life: 5, turn: 2.2, snd: 'missile' },
     },
-/* hidden for now
     {
       // KH-42 Marauder — the Kohr-Ah blade-thrower (blackurq.c stats).
+      // v0.49: restored to the roster per user request.
       key: 'marauder', name: 'KH-42 Marauder', role: 'dreadnought', cost: 30,
       r: 8, mass: 2.4, accel: 80, turn: 1.6, maxSpeed: 80,
       crew: 42, batt: 42, regen: 4.2, orbit: 60,
@@ -320,7 +320,6 @@
       weapon: { label: 'F.R.I.E.D.', kind: 'plasma', cd: 1.0, cost: 6, speed: 155, dmg: 10, size: 6, life: 2.0, count: 1, spread: 0, tol: 0.2, aoe: 36, snd: 'plasma' },
       special: { label: 'Buzzsaw Blades', type: 'mine', cost: 12, cd: 1.5, dmg: 8, rad: 22, maxMines: 6, snd: 'mine' },
     },
-    */
     {
       // UQ-42 Dreadnought — the Ur-Quan Kzer-Za flagship (urquan.c: 42
       // crew, 42 battery, fusion bolts + autonomous fighters that ARE crew).
@@ -333,6 +332,20 @@
         label: 'Launch Fighters', type: 'fighters', cost: 8, cd: 0.5,
         fspeed: 250, flife: 7, laserRange: 110, laserDmg: 2, laserCd: 0.55,
       },
+    },
+    {
+      // THE PRECURSOR VESSEL — the campaign flagship, playable (v0.49).
+      // Twice the size of the Ur-Quan/Kohr-Ah dreadnoughts (r 16 vs 8),
+      // drawn at 2x sprite scale (sprScale). Costs the ENTIRE 3v3 budget —
+      // selecting it clears the other two slots (main.js cycleSlot).
+      // Weapon: the flagship's own auto-blaster art (flagship dir blaster-big).
+      // Special: a point-defense array — fitting for a capital ship.
+      key: 'flagship', name: 'Precursor Vessel', role: 'flagship', cost: 66,
+      r: 16, mass: 4.8, accel: 60, turn: 1.1, maxSpeed: 68, sprScale: 2,
+      crew: 60, batt: 60, regen: 3, orbit: 130,
+      sprite: 'SHIP:flagship', cap: 'flagship', icon: 'flagship',
+      weapon: { label: 'Auto-Blaster Array', kind: 'bolt', cd: 0.22, cost: 2.5, speed: 340, dmg: 4, size: 4, life: 0.8, count: 1, spread: 0.04, tol: 0.18, wspr: 'flagship_blaster', snd: 'bolt' },
+      special: { label: 'Point-Defense Grid', type: 'pointdef', cost: 5, cd: 4, dur: 3, rad: 170 },
     },
   ];
 

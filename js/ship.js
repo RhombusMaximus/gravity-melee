@@ -696,7 +696,7 @@
       if (this.dead) return;
       const T = GM.TEAMS[this.team];
       const e = U.eff(this.x, this.y);        // camera-space position
-      const PS = Math.max(0.5, 2.25 * GM.zoomCur * (this.scale || 1));   // proximity-scaled; FLOAT not round — integer PS quantized the dive into a single 2x step at zoom 1
+      const PS = Math.max(0.5, 2.25 * GM.zoomCur * (this.scale || 1) * (this.spec.sprScale || 1));   // proximity-scaled; FLOAT not round — integer PS quantized the dive into a single 2x step at zoom 1. sprScale: per-ship size multiplier (the 66-pt Precursor renders at 2x dreadnought scale)
       if (e.x < -40 || e.x > GM.WV + 40 || e.y < -40 || e.y > GM.WH + 40) return;   // culled
 
       if (this.shield > 0) {
