@@ -30,6 +30,10 @@
         H.landSel = H.landSel < 0 ? 0 : (H.landSel + 1) % nP;
         GM.A.SND.ui();
       } else if (e.code === 'Enter') {
+        // 2D system flight: a planet in reach auto-selects, ENTER lands
+        if (H.view === '2d' && H.nearPlanet >= 0 && H.nearPlanetD < 700) {
+          H.landSel = H.nearPlanet;
+        }
         H.tryLand();
       } else if (e.code === 'Escape') {
         H.sys = null; H.landSel = -1; GM.A.startMusic('hyper');
@@ -97,9 +101,12 @@
         mmClamp();
         stage.style.cursor = 'move';
       } else {
-        // drag right -> look right (yaw down), drag down -> pitch down
-        H.ship.yaw -= dx * 0.0042;
-        H.ship.pitch = U.clamp(H.ship.pitch - dy * 0.0035, -1.3, 1.3);
+        // drag right -> look right (yaw down), drag down -> pitch down —
+        // 3D chase-cam only; the 2D view has no free-look
+        if (H.view !== '2d') {
+          H.ship.yaw -= dx * 0.0042;
+          H.ship.pitch = U.clamp(H.ship.pitch - dy * 0.0035, -1.3, 1.3);
+        }
       }
     } else {
       if (overMinimap(e.clientX, e.clientY)) {
@@ -142,7 +149,7 @@
       const hx = (e.clientX - hr.left) * GM.VW / hr.width;
       const hy = (e.clientY - hr.top) * GM.VH / hr.height;
       const nx = U.clamp((hx - MM_X() - MM_PAD) / (MM_W - MM_PAD * 2), 0, 1);
-      const ny = U.clamp((hy - MM_Y - MM_PAD) / (MM_W - MM_PAD * 2), 0, 1);
+      const ny = U.clamp((hy - MM_Y() - MM_PAD) / (MM_W - MM_PAD * 2), 0, 1);
       const mapNx = H.mmCx + (nx - 0.5) / H.mmZoom;
       const mapNy = H.mmCy + (ny - 0.5) / H.mmZoom;
       H.mmZoom = U.clamp(H.mmZoom * (e.deltaY > 0 ? 0.78 : 1.28), 1, 12);
@@ -150,6 +157,9 @@
       H.mmCx = mapNx - (nx - 0.5) / H.mmZoom;
       H.mmCy = mapNy - (ny - 0.5) / H.mmZoom;
       mmClamp();
+    } else if (H.view === '2d') {
+      // 2D mode: the wheel zooms the flat map view
+      H.z2d = U.clamp(H.z2d * (e.deltaY > 0 ? 0.82 : 1.22), 0.06, 1.4);
     } else {
       H.zoom = U.clamp(H.zoom * (e.deltaY > 0 ? 1.13 : 0.885), 0.4, 2.8);
     }
@@ -182,7 +192,7 @@
   // ---- minimap interaction: zoom, pan, click stars ----
   const MM_W = 120;                              // minimap box size in HUD px
   const MM_X = () => GM.VW - MM_W - 8;
-  const MM_Y = 8;
+  const MM_Y = () => 70;                         // below the status block
   const MM_PAD = 2;
 
   // true when a client-space position is over the minimap box
@@ -191,7 +201,7 @@
     const hr = hud.getBoundingClientRect();
     const hx = (cx - hr.left) * GM.VW / hr.width;
     const hy = (cy - hr.top) * GM.VH / hr.height;
-    const mx = MM_X(), my = MM_Y;
+    const mx = MM_X(), my = MM_Y();
     return hx >= mx - 4 && hx <= mx + MM_W + 4 && hy >= my - 4 && hy <= my + MM_W + 4;
   }
 
@@ -256,6 +266,12 @@
   H.landers = 3;           // landers aboard the flagship
   H.cargo = { cats: [0, 0, 0, 0, 0, 0, 0, 0], bio: 0 };
   H.summary = null;        // { t, lines } shown over the orbit view
+  H.view = '2d';           // main hyperspace view: the classic top-down 2D map
+  H.z2d = 0.26;            // 2D map zoom (px per world unit)
+  H.nearPlanet = -1;       // auto-selected planet in the 2D system view
+  H.nearPlanetD = Infinity;
+  H.neb2 = [];             // 2D hyperspace nebula dots (parallax layer)
+  H.insCv = null;          // offscreen canvas for the 3D inset mini-map
   H.sysScr = [];           // planet screen positions this frame (orbit view)
 
   // small seeded PRNG for the backdrop + per-system planet layout
@@ -352,10 +368,19 @@
         b: 0.10 + rnd() * 0.22, s: rnd() < 0.06 ? 2 : 1,
         c: rnd() < 0.7 ? '#cfd8ea' : (rnd() < 0.5 ? '#ffd9b0' : '#b0c8ff') });
     }
+    // 2D hyperspace nebula (deep-red blotches, drawn with 0.35 parallax)
+    const rnd2 = prng(21550101);
+    H.neb2 = [];
+    for (let i = 0; i < 120; i++) {
+      H.neb2.push({ x: rnd2() * 30000 - 15000, y: rnd2() * 30000 - 15000,
+        r: 100 + rnd2() * 300, a: 0.05 + rnd2() * 0.09 });
+    }
+    H.z2d = 0.26; H.nearPlanet = -1; H.nearPlanetD = Infinity;
   };
 
   H.update = (dt) => {
     H.t += dt;
+    if (H.view === '2d') { H.update2D(dt); return; }
     H.zoomCur += (H.zoom - H.zoomCur) * (1 - Math.pow(0.01, dt));
     if (H.sys !== null) return;   // in the orbit view nothing flies
     const s = H.ship;
@@ -483,8 +508,432 @@
     if (GM.LANDER.begin(H.sys, H.landSel, nm)) H.land = GM.LANDER.active;
   };
 
+  // ============== the classic 2D hyperspace (main view) ==============
+  // The original game's presentation: a top-down flat starmap the flagship
+  // flies across, entering systems and flying between orbiting planets.
+  // Our old 3D chase-cam lives on as the second mini-map (the inset).
+
+  const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  function stardate(days) {
+    const d = (days - 1) % 360;
+    const y = 2155 + Math.floor((days - 1) / 360);
+    return (d % 30 + 1) + ' ' + MONTHS[Math.floor(d / 30)] + ' ' + y;
+  }
+
+  // UQM facing sheets are north-clockwise (frame 0 = north); our yaw is a
+  // canvas angle (0 = east) — the same mapping as the lander and blazer
+  function frame2D(yaw) {
+    return Math.round(((((yaw + Math.PI / 2) % U.TAU) + U.TAU) % U.TAU) / (U.TAU / 16)) % 16;
+  }
+
+  function drawFlagship2D(g, cx, cy, yaw, sc, thrusting, t) {
+    const fi = frame2D(yaw);
+    const img = H.flag[fi];
+    if (!img || !img.complete || !img.naturalWidth) return;
+    const a = (GM.CONTENT.navsprites.flagship.a || [])[fi] || [8, 8];
+    g.imageSmoothingEnabled = false;
+    g.drawImage(img, cx - a[0] * sc, cy - a[1] * sc, img.naturalWidth * sc, img.naturalHeight * sc);
+    if (thrusting) {
+      const bx = cx - Math.cos(yaw) * 16 * sc * 0.25;
+      const by = cy - Math.sin(yaw) * 16 * sc * 0.25;
+      g.globalAlpha = 0.45 + 0.3 * Math.sin(t * 30);
+      g.fillStyle = '#ffca7a';
+      g.beginPath(); g.arc(bx, by, 5 * sc * 0.25 + Math.random() * 3, 0, U.TAU); g.fill();
+      g.globalAlpha = 1;
+    }
+  }
+
+  H.update2D = (dt) => {
+    const s = H.ship;
+    // campaign clock: 30s = 1 day, in hyperspace and in-system alike
+    H.dayT += dt;
+    if (H.dayT >= 30) { H.dayT -= 30; H.days++; }
+    if (H.warp) {
+      const w = H.warp;
+      w.t += dt;
+      const p = Math.min(1, w.t / w.dur);
+      const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+      s.x = w.sx + (w.tx - w.sx) * e;
+      s.y = w.sy + (w.ty - w.sy) * e;
+      if (p >= 1) { s.spd = 0; H.warp = null; }
+    } else {
+      const turn = (k['KeyD'] || k['ArrowRight'] ? 1 : 0) - (k['KeyA'] || k['ArrowLeft'] ? 1 : 0);
+      s.yaw += turn * 2.6 * dt;
+      const boost = (k['ShiftLeft'] || k['ShiftRight']) ? 2 : 1;
+      if (k['KeyW'] || k['ArrowUp']) s.spd = Math.min(MAX_SPEED * boost, s.spd + ACCEL * boost * dt);
+      else s.spd = Math.max(0, s.spd - 260 * dt);
+      if (k['KeyS'] || k['ArrowDown']) s.spd = Math.max(0, s.spd - 3600 * dt);
+      s.x += Math.cos(s.yaw) * s.spd * dt;
+      s.y += Math.sin(s.yaw) * s.spd * dt;
+    }
+    // nearest system (for the ENTER prompt)
+    let bd = Infinity, bi = -1;
+    for (let i = 0; i < GM.STARS.length; i++) {
+      const st = GM.STARS[i];
+      const dx = st[2] - s.x, dy = st[3] - s.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bd) { bd = d2; bi = i; }
+    }
+    H.near = bi; H.nearD = Math.sqrt(bd);
+    // in-system: track the nearest planet for auto-select landing
+    H.nearPlanet = -1; H.nearPlanetD = Infinity;
+    if (H.sys !== null) {
+      const st = GM.STARS[H.sys];
+      for (const p of H.sysPlanets(H.sys)) {
+        const a = H.t * p.spd + p.phase;
+        const px = st[2] + Math.cos(a) * p.oR;
+        const py = st[3] + Math.sin(a) * p.oR;
+        const d = Math.hypot(px - s.x, py - s.y);
+        if (d < H.nearPlanetD) { H.nearPlanetD = d; H.nearPlanet = p.i; }
+      }
+    }
+  };
+
+  H.drawWorld2D = (g, t) => {
+    g.fillStyle = '#150906';   // hyperspace: deep red, like the original
+    g.fillRect(0, 0, GM.WV, GM.WH);
+    const s = H.ship, z = H.z2d;
+    const CW = GM.WV / 2, CH = GM.WH / 2;
+    const sxOf = (wx) => CW + (wx - s.x) * z;
+    const syOf = (wy) => CH + (wy - s.y) * z;
+
+    // nebula layer (0.35 parallax against the map)
+    for (const n of H.neb2) {
+      const nx = CW + (n.x - s.x * 0.35) * z;
+      const ny = CH + (n.y - s.y * 0.35) * z;
+      if (nx < -n.r || nx > GM.WV + n.r || ny < -n.r || ny > GM.WH + n.r) continue;
+      g.globalAlpha = n.a;
+      g.fillStyle = '#6e1f0e';
+      g.beginPath(); g.arc(nx, ny, n.r * z * 4, 0, U.TAU); g.fill();
+    }
+    g.globalAlpha = 1;
+
+    // constellation lines
+    g.strokeStyle = '#3a1e2c';
+    g.lineWidth = 1;
+    for (const cl of GM.STAR_CLUSTERS) {
+      let prev = null;
+      for (const idx of cl.s) {
+        const st = GM.STARS[idx];
+        const px = sxOf(st[2]), py = syOf(st[3]);
+        if (prev && px > -60 && px < GM.WV + 60 && py > -60 && py < GM.WH + 60) {
+          g.globalAlpha = 0.3;
+          g.beginPath(); g.moveTo(prev[0], prev[1]); g.lineTo(px, py); g.stroke();
+        }
+        prev = [px, py];
+      }
+    }
+    g.globalAlpha = 1;
+
+    // the stars
+    const warpK = H.warp ? Math.sin(Math.min(1, H.warp.t / H.warp.dur) * Math.PI) : 0;
+    const warpAng = H.warp ? Math.atan2(H.warp.ty - H.warp.sy, H.warp.tx - H.warp.sx) : 0;
+    const labels = [];
+    for (let i = 0; i < GM.STARS.length; i++) {
+      const st = GM.STARS[i];
+      const x = sxOf(st[2]), y = syOf(st[3]);
+      if (x < -40 || x > GM.WV + 40 || y < -40 || y > GM.WH + 40) continue;
+      const col = COLMAP[st[5]] || '#fff';
+      const base = st[6] === 3 ? 7.5 : (st[6] === 2 ? 4.6 : 2.6);
+      const rad = U.clamp(base, 2, 8);
+      if (st[6] > 1) {
+        g.globalAlpha = 0.22;
+        g.fillStyle = col;
+        g.beginPath(); g.arc(x, y, rad * 2.2, 0, U.TAU); g.fill();
+        g.globalAlpha = 1;
+      }
+      if (warpK > 0.05) {
+        // warp streaks: stars stretch opposite the travel direction
+        g.globalAlpha = 0.55 * warpK;
+        g.strokeStyle = col;
+        g.lineWidth = Math.max(1, rad * 0.8);
+        g.beginPath();
+        g.moveTo(x, y);
+        g.lineTo(x - Math.cos(warpAng) * 110 * warpK, y - Math.sin(warpAng) * 110 * warpK);
+        g.stroke();
+        g.globalAlpha = 1;
+      }
+      g.fillStyle = col;
+      g.beginPath(); g.arc(x, y, rad, 0, U.TAU); g.fill();
+      if (i === H.hover && H.hover !== H.sel) {
+        g.globalAlpha = 0.9;
+        g.strokeStyle = '#fff'; g.lineWidth = 1;
+        g.beginPath(); g.arc(x, y, rad + 7, 0, U.TAU); g.stroke();
+        g.globalAlpha = 1;
+      }
+      if (i === H.sel) {
+        const bl = 0.7 + 0.3 * Math.sin(t * 5);
+        g.globalAlpha = bl;
+        g.strokeStyle = '#fff'; g.lineWidth = 1.5;
+        g.beginPath(); g.arc(x, y, rad + 10, 0, U.TAU); g.stroke();
+        g.beginPath(); g.arc(x, y, rad + 14, 0, U.TAU); g.stroke();
+        g.globalAlpha = 1;
+      }
+      const dx = st[2] - s.x, dy = st[3] - s.y;
+      const d = Math.hypot(dx, dy);
+      if (d < 4200) labels.push({ x, y, n: starName(st), c: col, d });
+    }
+    // labels: nearest eight
+    labels.sort((a, b) => a.d - b.d);
+    g.font = '13px monospace';
+    g.textAlign = 'left';
+    const nLab = Math.min(labels.length, 8);
+    for (let i = 0; i < nLab; i++) {
+      const L = labels[i];
+      g.globalAlpha = U.clamp(1 - L.d / 5000, 0.15, 0.9);
+      g.fillStyle = L.c;
+      g.fillText(L.n, L.x + 10, L.y - 9);
+    }
+    g.globalAlpha = 1;
+
+    // the flagship, fixed at view center (the map scrolls under it)
+    drawFlagship2D(g, CW, CH, s.yaw, 4, (k['KeyW'] || k['ArrowUp'] || H.warp), t);
+  };
+
+  H.drawSystem2D = (g, t) => {
+    g.fillStyle = '#04060c';   // truespace: normal dark starfield
+    g.fillRect(0, 0, GM.WV, GM.WH);
+    const s = H.ship, z = H.z2d;
+    const st = GM.STARS[H.sys];
+    const CW = GM.WV / 2, CH = GM.WH / 2;
+    const sxOf = (wx) => CW + (wx - s.x) * z;
+    const syOf = (wy) => CH + (wy - s.y) * z;
+    const sunX = sxOf(st[2]), sunY = syOf(st[3]);
+
+    H.sysScr = [];   // planet positions for click picking (world-canvas px)
+
+    // the sun
+    const simg = H.sun.length ? H.sun[Math.floor(t * 9) % H.sun.length] : null;
+    if (simg && simg.complete && simg.naturalWidth > 0) {
+      const sc2 = 5;
+      const w = simg.naturalWidth * sc2, h = simg.naturalHeight * sc2;
+      const grd = g.createRadialGradient(sunX, sunY, w * 0.2, sunX, sunY, w * 1.6);
+      grd.addColorStop(0, 'rgba(255,220,150,0.35)');
+      grd.addColorStop(1, 'rgba(255,220,150,0)');
+      g.fillStyle = grd;
+      g.beginPath(); g.arc(sunX, sunY, w * 1.6, 0, U.TAU); g.fill();
+      g.imageSmoothingEnabled = false;
+      g.drawImage(simg, sunX - w / 2, sunY - h / 2, w, h);
+    } else {
+      g.fillStyle = COLMAP[st[5]] || '#ffd85e';
+      g.beginPath(); g.arc(sunX, sunY, 120, 0, U.TAU); g.fill();
+    }
+
+    // planets on flat circular orbits
+    const planets = H.sysPlanets(H.sys);
+    for (const p of planets) {
+      const a = H.t * p.spd + p.phase;
+      const px = st[2] + Math.cos(a) * p.oR;
+      const py = st[3] + Math.sin(a) * p.oR;
+      g.strokeStyle = '#1b2438';
+      g.globalAlpha = 0.8;
+      g.beginPath(); g.arc(sunX, sunY, p.oR * z, 0, U.TAU); g.stroke();
+      g.globalAlpha = 1;
+      const X = sxOf(px), Y = syOf(py);
+      H.sysScr.push({ i: p.i, x: X, y: Y });
+      const pim = H.planetImgs[p.img];
+      const dd = p.d * 0.6;
+      if (pim && pim.complete && pim.naturalWidth > 0) {
+        g.imageSmoothingEnabled = false;
+        g.drawImage(pim, X - dd / 2, Y - dd / 2, dd, dd);
+      }
+      if (H.landSel === p.i) {
+        const bl = 0.7 + 0.3 * Math.sin(t * 5);
+        g.globalAlpha = bl;
+        g.strokeStyle = '#fff'; g.lineWidth = 2;
+        g.beginPath(); g.arc(X, Y, dd / 2 + 14, 0, U.TAU); g.stroke();
+        g.beginPath(); g.arc(X, Y, dd / 2 + 22, 0, U.TAU); g.stroke();
+        g.globalAlpha = 1;
+        const prof = GM.LANDER && GM.LANDER.profile(starName(st), p.i);
+        if (prof) {
+          g.font = 'bold 16px monospace';
+          g.textAlign = 'center';
+          g.fillStyle = prof.gas ? '#8fa2c0' : '#cfe0ff';
+          g.fillText(prof.name.toUpperCase(), X, Y + dd / 2 + 40);
+          g.font = '13px monospace';
+          g.fillStyle = '#8fa2c0';
+          g.fillText(prof.label.toUpperCase() + (prof.gas ? '' :
+            ' · ' + prof.temp + '\u00B0C · TECT ' + prof.tect + ' · WX ' + prof.wx +
+            ' · LIFE ' + prof.life), X, Y + dd / 2 + 60);
+          g.textAlign = 'left';
+        }
+      } else if (H.nearPlanet === p.i && H.nearPlanetD < 700) {
+        g.globalAlpha = 0.5 + 0.3 * Math.sin(t * 6);
+        g.strokeStyle = '#3fc8ff'; g.lineWidth = 2;
+        g.beginPath(); g.arc(X, Y, dd / 2 + 14, 0, U.TAU); g.stroke();
+        g.globalAlpha = 1;
+      }
+    }
+    // the flagship
+    drawFlagship2D(g, CW, CH, s.yaw, 4, (k['KeyW'] || k['ArrowUp']), t);
+  };
+
+  // ---- compact 3D scenes for the inset mini-map (our old chase-cam) ----
+  function drawChevron(g, t, proj, s, warpK) {
+    const r = 14;
+    const sv = [
+      [r * 1.3, 0, 0],
+      [-r * 0.55, r * 0.85, -r * 0.15],
+      [-r * 0.55, -r * 0.85, -r * 0.15],
+      [-r * 0.3, 0, r * 0.45],
+    ];
+    const sf = fwd(s.yaw, s.pitch || 0), srr = rightv(s.yaw), su = upv(sf, srr);
+    function shipPt(lx, ly, lz) {
+      return proj(s.x + sf[0] * lx + srr[0] * ly + su[0] * lz,
+        s.y + sf[1] * lx + srr[1] * ly + su[1] * lz,
+        (s.z || 0) + sf[2] * lx + srr[2] * ly + su[2] * lz);
+    }
+    const P = sv.map((v) => shipPt(v[0], v[1], v[2]));
+    if (!P.every((p) => p)) return;
+    g.fillStyle = '#155a9e';
+    g.beginPath();
+    g.moveTo(P[0][0], P[0][1]); g.lineTo(P[1][0], P[1][1]); g.lineTo(P[3][0], P[3][1]);
+    g.closePath(); g.fill();
+    g.beginPath();
+    g.moveTo(P[0][0], P[0][1]); g.lineTo(P[2][0], P[2][1]); g.lineTo(P[3][0], P[3][1]);
+    g.closePath(); g.fill();
+    g.strokeStyle = '#7fd4ff';
+    g.lineWidth = 1.5;
+    g.beginPath();
+    g.moveTo(P[0][0], P[0][1]); g.lineTo(P[1][0], P[1][1]);
+    g.lineTo(P[3][0], P[3][1]); g.lineTo(P[2][0], P[2][1]);
+    g.closePath(); g.stroke();
+    // engine glow
+    if (k['KeyW'] || warpK > 0.1) {
+      const ex = P[3][0] + (P[3][0] - P[0][0]) * 0.3;
+      const ey = P[3][1] + (P[3][1] - P[0][1]) * 0.3;
+      g.globalAlpha = 0.4 + 0.3 * Math.sin(t * 30);
+      g.fillStyle = warpK > 0.1 ? '#9ff0ff' : '#ffca7a';
+      g.beginPath(); g.ellipse(ex, ey, 6, 3, 0, 0, U.TAU); g.fill();
+      g.globalAlpha = 1;
+    }
+    g.lineWidth = 1;
+  }
+
+  function chaseBasis(W, Hh) {
+    const s = H.ship;
+    const f = fwd(s.yaw, s.pitch || 0);
+    const r = rightv(s.yaw);
+    const u = upv(f, r);
+    const camB = CAM_BACK;
+    const cx0 = s.x - f[0] * camB;
+    const cy0 = s.y - f[1] * camB;
+    const cz0 = (s.z || 0) - f[2] * camB + CAM_UP;
+    const CW = W / 2, CH = Hh / 2;
+    const fov = FOV * (W / GM.WV);
+    return {
+      f, r, u, CW, CH, fov,
+      proj(px, py, pz) {
+        const dx = px - cx0, dy = py - cy0, dz = pz - cz0;
+        const cz = dx * f[0] + dy * f[1] + dz * f[2];
+        if (cz < 40) return null;
+        const ox = dx * r[0] + dy * r[1] + dz * r[2];
+        const oy = dx * u[0] + dy * u[1] + dz * u[2];
+        return [CW + ox * fov / cz, CH - oy * fov / cz, cz];
+      },
+    };
+  }
+
+  H.scene3D = (g, t, W, Hh) => {
+    g.fillStyle = '#04060c';
+    g.fillRect(0, 0, W, Hh);
+    const { f, r, u, proj } = chaseBasis(W, Hh);
+    // backdrop dots
+    for (const b of H.bg) {
+      const cz = b.x * f[0] + b.y * f[1] + b.z * f[2];
+      if (cz < 0.05) continue;
+      const ox = b.x * r[0] + b.y * r[1] + b.z * r[2];
+      const oy = b.x * u[0] + b.y * u[1] + b.z * u[2];
+      const sx = W / 2 + ox / cz * FOV * 0.32 * (W / GM.WV);
+      const sy = Hh / 2 - oy / cz * FOV * 0.32 * (W / GM.WV);
+      if (sx < 0 || sx > W || sy < 0 || sy > Hh) continue;
+      g.globalAlpha = b.b;
+      g.fillStyle = b.c;
+      g.fillRect(sx, sy, b.s, b.s);
+    }
+    g.globalAlpha = 1;
+    // constellation lines
+    g.strokeStyle = '#33456e';
+    g.lineWidth = 1;
+    for (const cl of GM.STAR_CLUSTERS) {
+      let prev = null;
+      for (const idx of cl.s) {
+        const st = GM.STARS[idx];
+        const p = proj(st[2], st[3], st[4]);
+        if (prev && p) {
+          g.globalAlpha = 0.18;
+          g.beginPath(); g.moveTo(prev[0], prev[1]); g.lineTo(p[0], p[1]); g.stroke();
+        }
+        prev = p;
+      }
+    }
+    g.globalAlpha = 1;
+    // stars
+    const warpK = H.warp ? Math.sin(Math.min(1, H.warp.t / H.warp.dur) * Math.PI) : 0;
+    for (let i = 0; i < GM.STARS.length; i++) {
+      const st = GM.STARS[i];
+      const p = proj(st[2], st[3], st[4]);
+      if (!p || p[0] < -10 || p[0] > W + 10 || p[1] < -10 || p[1] > Hh + 10) continue;
+      const fog = U.clamp(1 - p[2] / 26000, 0.12, 1);
+      const base = st[6] === 3 ? 7.5 : (st[6] === 2 ? 4.6 : 2.6);
+      const rad = U.clamp(base * 900 / p[2], 0.8, 5) * (W / GM.WV);
+      const col = COLMAP[st[5]] || '#fff';
+      g.globalAlpha = fog;
+      g.fillStyle = col;
+      g.beginPath(); g.arc(p[0], p[1], rad, 0, U.TAU); g.fill();
+    }
+    g.globalAlpha = 1;
+    // the ship
+    drawChevron(g, t, proj, H.ship, warpK);
+  };
+
+  H.sceneSys3D = (g, t, W, Hh) => {
+    g.fillStyle = '#04060c';
+    g.fillRect(0, 0, W, Hh);
+    const { proj } = chaseBasis(W, Hh);
+    const st = GM.STARS[H.sys];
+    // the sun
+    const sp = proj(st[2], st[3], st[4]);
+    if (sp) {
+      const grd = g.createRadialGradient(sp[0], sp[1], 4, sp[0], sp[1], 70);
+      grd.addColorStop(0, 'rgba(255,220,150,0.5)');
+      grd.addColorStop(1, 'rgba(255,220,150,0)');
+      g.fillStyle = grd;
+      g.beginPath(); g.arc(sp[0], sp[1], 70, 0, U.TAU); g.fill();
+      g.fillStyle = COLMAP[st[5]] || '#ffd85e';
+      g.beginPath(); g.arc(sp[0], sp[1], 22, 0, U.TAU); g.fill();
+    }
+    // planets on tilted ellipses
+    for (const p of H.sysPlanets(H.sys)) {
+      const a = H.t * p.spd + p.phase;
+      const px = st[2] + Math.cos(a) * p.oR;
+      const py = st[3] + Math.sin(a) * p.oR * 0.42;
+      const pp = proj(px, py, st[4]);
+      if (!pp) continue;
+      g.strokeStyle = '#1b2438';
+      g.globalAlpha = 0.5;
+      g.beginPath(); g.ellipse((sp ? sp[0] : W / 2), (sp ? sp[1] : Hh / 2),
+        p.oR * (FOV * (W / GM.WV)) / Math.max(200, sp ? sp[2] : 800),
+        p.oR * 0.42 * (FOV * (W / GM.WV)) / Math.max(200, sp ? sp[2] : 800), 0, 0, U.TAU);
+      g.stroke();
+      g.globalAlpha = 1;
+      const im = H.planetImgs[p.img];
+      const ds = U.clamp(1600 / pp[2], 2, 14);
+      if (im && im.complete && im.naturalWidth > 0) {
+        g.imageSmoothingEnabled = false;
+        g.drawImage(im, pp[0] - ds / 2, pp[1] - ds / 2, ds, ds);
+      }
+    }
+    drawChevron(g, t, proj, H.ship, 0);
+  };
+
   // ---- rendering ----
   H.drawWorld = (g, t) => {
+    if (H.view === '2d') {
+      if (H.sys !== null) H.drawSystem2D(g, t);
+      else H.drawWorld2D(g, t);
+      return;
+    }
     g.fillStyle = '#04060c';
     g.fillRect(0, 0, GM.WV, GM.WH);
     if (H.sys !== null) { H.drawSystem(g, t); return; }
@@ -765,77 +1214,47 @@
   H.drawHUD = (g, t) => {
     g.textAlign = 'left';
     g.font = 'bold 8px monospace';
+
+    // ---- right column: status block ABOVE the two mini-maps ----
+    // (the original game's top-bar: date, fuel, landers, cargo)
+    const RX = MM_X(), RW = MM_W;
+    g.fillStyle = 'rgba(4,6,12,0.82)';
+    g.fillRect(RX - 4, 4, RW + 8, 62);
+    g.strokeStyle = '#1b2438';
+    g.strokeRect(RX - 4, 4, RW + 8, 62);
+    g.fillStyle = '#cfe0ff';
+    g.fillText('DAY ' + H.days, RX, 14);
+    g.fillStyle = '#8fa2c0';
+    g.fillText(stardate(H.days), RX, 23);
+    // fuel bar + number
+    g.fillStyle = '#232c40';
+    g.fillRect(RX, 27.5, RW - 34, 4);
+    const fuelFrac = H.fuel / H.fuelMax;
+    g.fillStyle = fuelFrac > 0.3 ? '#ffd85e' : '#ff5648';
+    g.fillRect(RX, 27.5, Math.round((RW - 34) * fuelFrac), 4);
+    g.fillStyle = '#55688a';
+    g.fillText(String(H.fuel), RX + RW - 30, 32);
+    g.fillStyle = '#55688a';
+    g.fillText('LANDERS ' + H.landers, RX, 41);
+    const minRU = H.cargo.cats.reduce((a, b) => a + b, 0);
+    g.fillText('CARGO ' + minRU + ' MIN · ' + H.cargo.bio + ' BIO', RX, 50);
     if (H.sys !== null) {
       const st = GM.STARS[H.sys];
       g.fillStyle = '#cfe0ff';
-      g.fillText('SYSTEM: ' + starName(st).toUpperCase(), 8, 14);
-      g.font = '8px monospace';
-      g.fillStyle = '#8fa2c0';
-      g.fillText('orbit view — [TAB] select planet · [ENTER] land · [ESC] hyperspace', 8, 26);
-      g.fillStyle = '#55688a';
-      g.fillText('LANDERS ' + H.landers + ' · CARGO ' +
-        H.cargo.cats.reduce((a, b) => a + b, 0) + ' MIN · ' + H.cargo.bio + ' BIO', 8, 38);
-      // landing prompt
-      if (H.landSel >= 0 && GM.LANDER) {
-        const prof = GM.LANDER.profile(starName(st), H.landSel);
-        g.textAlign = 'center';
-        g.font = 'bold 11px monospace';
-        const blink = Math.sin(t * 4) > -0.4;
-        if (prof && prof.gas) {
-          g.fillStyle = '#ffab3d';
-          g.fillText(prof.name.toUpperCase() + ' IS A GAS GIANT — CANNOT LAND', GM.VW / 2, GM.VH - 34);
-        } else if (H.landers <= 0) {
-          g.fillStyle = '#ff5648';
-          g.fillText('NO LANDERS LEFT', GM.VW / 2, GM.VH - 34);
-        } else if (blink) {
-          g.fillStyle = '#fff';
-          g.fillText('[ENTER] LAND ON ' + (prof ? prof.name.toUpperCase() : 'PLANET'), GM.VW / 2, GM.VH - 34);
-        }
-        g.textAlign = 'left';
-      }
-      // post-landing summary
-      if (H.summary) {
-        H.summary.t += 1 / 60;
-        if (H.summary.t > 5) H.summary = null;
-        else {
-          g.textAlign = 'center';
-          g.font = 'bold 11px monospace';
-          g.globalAlpha = Math.min(1, (5 - H.summary.t) * 2);
-          H.summary.lines.forEach((ln, i) => {
-            g.fillStyle = i === 0 ? '#fff' : '#8fa2c0';
-            g.fillText(ln, GM.VW / 2, 70 + i * 16);
-          });
-          g.globalAlpha = 1;
-          g.textAlign = 'left';
-        }
-      }
-      return;
+      g.fillText('SYSTEM ' + starName(st).toUpperCase(), RX, 60);
+    } else if (H.sel !== null && H.sel >= 0) {
+      const st = GM.STARS[H.sel];
+      g.fillStyle = COLMAP[st[5]] || '#cfe0ff';
+      g.fillText('TARGET ' + starName(st).toUpperCase(), RX, 60);
     }
-    if (!H.ship) return;
-    g.fillStyle = '#cfe0ff';
-    g.fillText('HYPERSPACE · DAY ' + H.days, 8, 14);
-    g.font = '8px monospace';
-    g.fillStyle = '#8fa2c0';
-    g.fillText('VEL ' + Math.round(H.ship.spd) + ' U/S' +
-      ((k['ShiftLeft'] || k['ShiftRight']) && H.ship.spd > 400 ? '  [BOOST]' : ''), 8, 26);
-    // fuel bar
-    const fw = 90, fx = 8, fy = 32;
-    g.fillStyle = '#232c40';
-    g.fillRect(fx, fy, fw, 4);
-    const fuelFrac = H.fuel / H.fuelMax;
-    g.fillStyle = fuelFrac > 0.3 ? '#ffd85e' : '#ff5648';
-    g.fillRect(fx, fy, Math.round(fw * fuelFrac), 4);
-    g.fillStyle = '#55688a';
-    g.fillText('FUEL ' + H.fuel, fx + fw + 6, fy + 4);
 
-    // ---- minimap (top-down radar: zoomable, pannable, clickable) ----
-    const MW = MM_W, MX = MM_X(), MY = MM_Y;
+    // ---- first mini-map: the 2D radar (zoomable, pannable, clickable) ----
+    const MW = MM_W, MX = MM_X(), MY = MM_Y();
     const mmBox = MW - MM_PAD * 2;
     g.fillStyle = 'rgba(4,6,12,0.82)';
     g.fillRect(MX, MY, MW, MW);
     g.strokeStyle = H.mmDrag ? '#3fc8ff' : '#1b2438';
     g.strokeRect(MX, MY, MW, MW);
-    // stars: transform through the minimap zoom/center
     const dotSize = H.mmZoom > 3 ? 2 : 1;
     for (let i = 0; i < H.mm.length; i++) {
       const nx = (H.mm[i][0] - H.mmCx) * H.mmZoom + 0.5;
@@ -848,7 +1267,7 @@
       g.fillRect(MX + MM_PAD + nx * mmBox - (ds >> 1), MY + MM_PAD + ny * mmBox - (ds >> 1), ds, ds);
     }
     g.globalAlpha = 1;
-    // player + heading (transformed through the minimap zoom)
+    // player + heading
     const px = (H.ship.x - H.mmBounds.mnx) / H.mmBounds.spanX;
     const py = (H.ship.y - H.mmBounds.mny) / H.mmBounds.spanY;
     const pnx = (px - H.mmCx) * H.mmZoom + 0.5;
@@ -869,60 +1288,95 @@
       const snx = (H.mm[H.sel][0] - H.mmCx) * H.mmZoom + 0.5;
       const sny = (H.mm[H.sel][1] - H.mmCy) * H.mmZoom + 0.5;
       if (snx >= 0 && snx <= 1 && sny >= 0 && sny <= 1) {
-        const sx2 = MX + MM_PAD + snx * mmBox;
-        const sy2 = MY + MM_PAD + sny * mmBox;
         g.strokeStyle = '#3fc8ff';
-        g.beginPath(); g.arc(sx2, sy2, 4, 0, U.TAU); g.stroke();
+        g.beginPath(); g.arc(MX + MM_PAD + snx * mmBox, MY + MM_PAD + sny * mmBox, 4, 0, U.TAU); g.stroke();
       }
     }
-    // zoom indicator + hints
     if (H.mmZoom > 1.05) {
       g.font = '7px monospace';
       g.fillStyle = '#3fc8ff';
       g.textAlign = 'center';
       g.fillText('×' + H.mmZoom.toFixed(1), MX + MW / 2, MY + MW - 4);
-      g.fillText('DBL-CLICK resets', MX + MW / 2, MY + MW + 8);
       g.textAlign = 'left';
     }
 
-    // ---- targeted-system panel (under the minimap) ----
-    if (H.sel !== null && H.sel >= 0) {
-      const st = GM.STARS[H.sel];
-      const dx = st[2] - H.ship.x, dy = st[3] - H.ship.y, dz = st[4] - H.ship.z;
-      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      const col = COLMAP[st[5]] || '#cfe0ff';
+    // ---- second mini-map: our 3D hyperspace view, below the radar ----
+    const IY = MY + MW + 8;
+    if (!H.insCv) {
+      H.insCv = document.createElement('canvas');
+      H.insCv.width = 240; H.insCv.height = 180;
+    }
+    const ig = H.insCv.getContext('2d');
+    if (H.sys !== null) H.sceneSys3D(ig, t, 240, 180);
+    else H.scene3D(ig, t, 240, 180);
+    g.drawImage(H.insCv, MX, IY, MW, 90);
+    g.strokeStyle = '#1b2438';
+    g.strokeRect(MX, IY, MW, 90);
+    g.font = '7px monospace';
+    g.fillStyle = '#55688a';
+    g.fillText('3D VIEW', MX + 2, IY + 8);
+
+    // ---- top-left: mode banner ----
+    if (H.sys !== null) {
+      const st = GM.STARS[H.sys];
       g.font = 'bold 8px monospace';
-      g.fillStyle = col;
-      g.fillText('TARGET: ' + starName(st).toUpperCase(), MX, MY + MW + 14);
+      g.fillStyle = '#cfe0ff';
+      g.fillText('SYSTEM: ' + starName(st).toUpperCase(), 8, 14);
       g.font = '8px monospace';
       g.fillStyle = '#8fa2c0';
-      g.fillText('CLASS ' + st[5] + ' · ' + Math.round(d) + ' U', MX, MY + MW + 24);
-      const cl = st[7] >= 0 ? GM.STAR_CLUSTERS[st[7]] : null;
-      if (cl) { g.fillStyle = '#55688a'; g.fillText('IN ' + cl.n.toUpperCase(), MX, MY + MW + 34); }
+      g.fillText('fly to a planet · [TAB] select · [ENTER] land · [ESC] leave', 8, 26);
+    } else {
+      g.font = 'bold 8px monospace';
+      g.fillStyle = '#cfe0ff';
+      g.fillText('HYPERSPACE · DAY ' + H.days, 8, 14);
+      g.font = '8px monospace';
+      g.fillStyle = '#8fa2c0';
+      g.fillText('VEL ' + Math.round(H.ship.spd) + ' U/S' +
+        ((k['ShiftLeft'] || k['ShiftRight']) && H.ship.spd > 400 ? '  [BOOST]' : ''), 8, 26);
     }
 
-    // ---- bottom-left nearest + prompt ----
-    if (H.near >= 0 && H.warp === null) {
+    // ---- bottom-left nearest star ----
+    if (H.near >= 0 && H.warp === null && H.sys === null) {
       const st = GM.STARS[H.near];
       g.font = '8px monospace';
       g.textAlign = 'left';
       g.fillStyle = COLMAP[st[5]] || '#cfe0ff';
       g.fillText(starName(st).toUpperCase() + '  ' + Math.round(H.nearD) + ' U', 8, GM.VH - 10);
     }
+
+    // ---- bottom-center prompts ----
     g.textAlign = 'center';
     g.font = 'bold 11px monospace';
-    g.fillStyle = '#fff';
     const blink = Math.sin(t * 4) > -0.4;
     if (H.warp) {
+      g.fillStyle = '#fff';
       g.fillText('WARPING TO ' + starName(GM.STARS[H.warp.i]).toUpperCase() + '…', GM.VW / 2, GM.VH - 34);
+    } else if (H.sys !== null) {
+      if (blink) {
+        if (H.landSel >= 0 && GM.LANDER) {
+          const prof = GM.LANDER.profile(starName(GM.STARS[H.sys]), H.landSel);
+          if (prof && prof.gas) {
+            g.fillStyle = '#ffab3d';
+            g.fillText(prof.name.toUpperCase() + ' IS A GAS GIANT — CANNOT LAND', GM.VW / 2, GM.VH - 34);
+          } else if (H.landers <= 0) {
+            g.fillStyle = '#ff5648';
+            g.fillText('NO LANDERS LEFT', GM.VW / 2, GM.VH - 34);
+          } else {
+            g.fillStyle = '#fff';
+            g.fillText('[ENTER] LAND ON ' + prof.name.toUpperCase(), GM.VW / 2, GM.VH - 34);
+          }
+        }
+      }
     } else if (H.near >= 0 && H.nearD < ENTER_RANGE && blink) {
+      g.fillStyle = '#fff';
       g.fillText('[ENTER] ENTER SYSTEM', GM.VW / 2, GM.VH - 34);
     } else if (H.sel !== null && H.sel >= 0 && blink) {
       const st2 = GM.STARS[H.sel];
-      const dx2 = st2[2] - H.ship.x, dy2 = st2[3] - H.ship.y, dz2 = st2[4] - H.ship.z;
-      const d2 = Math.sqrt(dx2*dx2 + dy2*dy2 + dz2*dz2);
+      const dx2 = st2[2] - H.ship.x, dy2 = st2[3] - H.ship.y;
+      const d2 = Math.hypot(dx2, dy2);
       const cost = Math.ceil(d2 / 1500);
       if (H.fuel >= cost) {
+        g.fillStyle = '#fff';
         g.fillText('[ENTER] WARP — ' + cost + ' FUEL', GM.VW / 2, GM.VH - 34);
       } else {
         g.fillStyle = '#ff5648';
@@ -931,10 +1385,31 @@
     }
     g.font = '8px monospace';
     g.fillStyle = '#55688a';
-    g.fillText('DRAG look · CLICK target · ENTER warp · RADAR: scroll=zoom, click=target · H help', GM.VW / 2, GM.VH - 6);
+    if (H.sys === null) {
+      g.fillText('A/D turn · W thrust · S brake · SHIFT boost · SCROLL zoom · CLICK target · RADAR: zoom/pan/click · H help', GM.VW / 2, GM.VH - 6);
+    } else {
+      g.fillText('A/D turn · W thrust · S brake · TAB select planet · ENTER land · ESC leave system', GM.VW / 2, GM.VH - 6);
+    }
+
+    // ---- post-landing summary ----
+    if (H.summary) {
+      H.summary.t += 1 / 60;
+      if (H.summary.t > 5) H.summary = null;
+      else {
+        g.textAlign = 'center';
+        g.font = 'bold 11px monospace';
+        g.globalAlpha = Math.min(1, (5 - H.summary.t) * 2);
+        H.summary.lines.forEach((ln, i) => {
+          g.fillStyle = i === 0 ? '#fff' : '#8fa2c0';
+          g.fillText(ln, GM.VW / 2, 70 + i * 16);
+        });
+        g.globalAlpha = 1;
+        g.textAlign = 'left';
+      }
+    }
 
     // ---- help card (until first input; H toggles) ----
-    if (H.help) {
+    if (H.help && H.sys === null) {
       g.fillStyle = 'rgba(4,6,12,0.72)';
       g.fillRect(0, 0, GM.VW, GM.VH);
       g.textAlign = 'center';
@@ -944,13 +1419,13 @@
       g.font = '10px monospace';
       g.fillStyle = '#8fa2c0';
       const lines = [
-        'DRAG — look around · SCROLL — zoom out to the whole map',
-        'CLICK a star — target it · ENTER or DOUBLE-CLICK — warp there',
-        'When you arrive in range: ENTER again to enter the system',
-        'W — thrust · S — brake · SHIFT — boost · A/D or ←/→ — yaw · R/F or ↑/↓ — pitch',
-        'Top right radar: scroll to zoom in, drag to pan, click stars to target',
-        '  (double-click a zoomed radar resets to the full map)',
-        'Warp costs fuel (distance ÷ 1500) · the day counter advances every 30s',
+        'The classic flat starmap: fly the flagship between 502 systems.',
+        'A/D — turn · W/S — thrust/brake · SHIFT — boost · SCROLL — zoom',
+        'CLICK a star — target it · ENTER — warp (costs fuel, ÷1500 per unit)',
+        'Arrive in range and ENTER again to drop into the system,',
+        'then fly to a planet and press ENTER to land the planetary module.',
+        'Top right: stardate and status, then the radar, then the 3D view.',
+        'Radar: scroll to zoom, drag to pan, click stars to target.',
         '',
         'press any key or click to begin · H shows this again',
       ];

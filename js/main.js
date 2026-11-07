@@ -376,8 +376,12 @@
     last = now;
 
     if (GM.state === 'hyper' && !GM.paused) {
-      if (GM.HYPER.land && GM.LANDER) GM.LANDER.update(Math.min(0.05, real * GM.speed));
-      else GM.HYPER.update(Math.min(0.05, real * GM.speed));
+      const hdt = Math.min(0.05, real * GM.speed);
+      // FX.update decays screenshake/particles — without it, a quake from a
+      // landing keeps shaking the hyperspace view forever
+      GM.FX.update(hdt);
+      if (GM.HYPER.land && GM.LANDER) GM.LANDER.update(hdt);
+      else GM.HYPER.update(hdt);
     }
 
     const simming = (GM.state === 'play' && !GM.paused) || GM.state === 'victory';

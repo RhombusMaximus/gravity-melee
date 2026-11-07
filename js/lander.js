@@ -626,12 +626,18 @@
       ly = syOf(A.y) - p * p * (GM.WH * 0.9);
     }
     if (A.phase !== 'dead') {
-      const fr = IMG.f.lander && IMG.f.lander[A.facing];
+      // the UQM facing sheets are NORTH-clockwise (frame 0 = north; proven
+      // by the lander green-window centroid tracing the circle) while our
+      // facing 0 = east — so sprite frame = (facing + 4) % 16, positioned
+      // by the .ani anchor (anchor maps to the lander's map position)
+      const fi = (A.facing + 4) % 16;
+      const fr = IMG.f.lander && IMG.f.lander[fi];
       if (fr && fr.complete && fr.naturalWidth > 0) {
+        const anchors = (GM.CONTENT.lander.f.lander.a || [])[fi] || [6, 6];
         const w = fr.naturalWidth * SC, hh = fr.naturalHeight * SC;
         g.imageSmoothingEnabled = false;
         if (A.dmgT > 0) { g.globalAlpha = 0.5 + 0.5 * Math.sin(t * 40); }
-        g.drawImage(fr, GM.WV / 2 - w / 2, ly - hh / 2, w, hh);
+        g.drawImage(fr, GM.WV / 2 - anchors[0] * SC, ly - anchors[1] * SC, w, hh);
         g.globalAlpha = 1;
         // engine flare while thrusting
         if ((k['KeyW'] || k['ArrowUp']) && A.phase === 'play') {
