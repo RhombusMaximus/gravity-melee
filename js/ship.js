@@ -104,7 +104,10 @@
 
       let accel = fm.accel * slowK * thrust;
       if (this.blazerT > 0) accel = fm.accel * 1.5;   // comet: always thrusting
-      if (thrust > 0 && this.burnActive) accel *= 2.1;
+      // Torch afterburner (thradd.c): SPECIAL_THRUST_INCREMENT 12 vs the
+      // normal 7 — exactly 12/7 thrust while burning; the Supox/Probe
+      // vector specials keep their tuned x2.1
+      if (thrust > 0 && this.burnActive) accel *= s.key === 'thraddash' ? 12 / 7 : 2.1;
       if (accel) {
         this.vx += Math.cos(this.ang) * accel * dt;
         this.vy += Math.sin(this.ang) * accel * dt;
@@ -131,8 +134,12 @@
         this.batt -= 3 * dt;
         if (this.batt <= 0) { this.blazerT = 0; this.batt = 0; }
       }
-      if (v > fm.maxSpeed) {
-        const k = s.maxSpeed / v;
+      // the afterburning Torch is the fastest thing in the sky (thradd.c:
+      // SPECIAL_MAX_THRUST 72 vs the Slylandro Probe's 60 — our 135-px/s
+      // Probe sets the scale, so the burn tops out around 162 px/s)
+      const msMax = (this.burnActive && s.key === 'thraddash') ? fm.maxSpeed * 1.41 : fm.maxSpeed;
+      if (v > msMax) {
+        const k = msMax / v;
         this.vx *= k; this.vy *= k;
       }
 
@@ -174,6 +181,14 @@
           life: 0.35, size: 2,
           col: this.burnActive ? '#b6f3ff' : '#ffca7a',
         });
+      }
+
+      // Thraddash afterburner: drop the damaging napalm trail behind the
+      // burning Torch (thradd.c drops a stationary flame element every
+      // activation; ours leaves one every 70ms while the engine runs)
+      if (this.burnActive && this.spec.key === 'thraddash' && this.thrusting) {
+        this.napalmT = (this.napalmT || 0) - dt;
+        if (this.napalmT <= 0) { world.spawnNapalm(this); this.napalmT = 0.07; }
       }
 
       // Blazer comet trail

@@ -169,6 +169,22 @@
       });
     }
 
+    // Thraddash afterburner exhaust (thradd.c): a STATIONARY napalm
+    // element dropped behind the ship each activation — NAPALM_DAMAGE 2,
+    // NAPALM_HITS 1 (single hit, then gone), NAPALM_LIFE 48 ticks (~1.2s),
+    // IGNORE_SIMILAR (team-checked, so it can never burn the Torch).
+    spawnNapalm(ship) {
+      const back = ship.ang + Math.PI;
+      this.shots.push({
+        x: ship.x + Math.cos(back) * (ship.r + 2),
+        y: ship.y + Math.sin(back) * (ship.r + 2),
+        vx: 0, vy: 0,
+        life: 1.2, team: ship.team, dmg: 2, size: 4,
+        kind: 'napalm', aoe: 0, by: ship, wspr: 'thraddash',
+        col: '#ffb04a', grav: 0, turn: 0, tgt: null, retgtT: 0,
+      });
+    }
+
     spawnMissile(ship) {
       const sp = ship.spec.special;
       this.missiles.push({
