@@ -84,9 +84,13 @@
   };
 
   // bake N palette-rotation frames from a disc canvas; returns the frame list.
-  // Uses a ping-pong shift (advance, reverse) with clamping at the ramp ends
-  // so bright pixels never wrap to the dark end — that produced a black
-  // blob on the sunlit face of cycle planets.
+  // v0.51: REFLECTION at the ramp ends, not clamping — clamping collapsed
+  // all colors past the ramp's top onto ONE color, so the peak-shift frames
+  // showed the gas bands flattened into a single hue ("no weather" glitch).
+  // Reflection mirrors back down the ramp, so every pixel keeps its own
+  // color and the bands stay distinct at every shift. Wrap-around is still
+  // forbidden (that was the black-blob bug: bright pixels landing on the
+  // dark ramp end).
   R.bakeCycleFrames = (src) => {
     const w = src.width, h = src.height;
     const d = src.getContext('2d').getImageData(0, 0, w, h).data;
@@ -99,17 +103,22 @@
     const lum = (c) => ((c >> 16) & 255) * 0.3 + ((c >> 8) & 255) * 0.6 + (c & 255) * 0.1;
     const ramp = [...seen.keys()].sort((a, b) => lum(a) - lum(b));
     const idx = new Map(ramp.map((c, i) => [c, i]));
-    const N = 12;
-    const half = Math.ceil(N / 2);
+    const top = ramp.length - 1;
+    const N = 10;
+    // v0.51: clean triangle 0,1,2,3,4,5,4,3,2,1 — the old 12-frame
+    // formula duplicated the extreme frames (5&6, 11&0 were identical
+    // pairs), which read as a stutter/hitch twice per cycle — the
+    // "glitchy" flicker. This sequence has NO consecutive duplicates.
     const frames = [];
     for (let f = 0; f < N; f++) {
-      // ping-pong: 0,1,2,...,5,5,4,...,1,0 — smooth both directions
-      const shift = f < half ? f : Math.max(0, (N - 1 - f) % half);
+      let shift = f < 5 ? f : 10 - f;
       const fd = new Uint8ClampedArray(d.length);
       for (let i = 0; i < d.length; i += 4) {
         const a = d[i + 3];
         if (a < 16) continue;
-        const j = Math.min(idx.get((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]) + shift, ramp.length - 1);
+        let j = idx.get((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]) + shift;
+        if (j > top) j = top - (j - top);   // reflect back down the ramp
+        if (j < 0) j = -j;
         const k = ramp[j];
         fd[i] = k >> 16; fd[i + 1] = (k >> 8) & 255; fd[i + 2] = k & 255; fd[i + 3] = a;
       }
@@ -132,7 +141,7 @@
   R.planetFrame = (t) => {
     if (!R.planetImg) return R.planetCv;
     if (R.planetFrames && R.planetFrames.length) {
-      return R.planetFrames[Math.floor((t || 0) * 9) % R.planetFrames.length];
+      return R.planetFrames[Math.floor((t || 0) * 2.5) % R.planetFrames.length];   // v0.51: 9fps read as flicker — 2.5fps ≈ the SC2 color-cycle feel
     }
     return R.planetImg;
   };
@@ -247,7 +256,7 @@
     const em = U.eff(mp.x, mp.y);
     let mcv = R.moonImg;
     if (mcv && R.moonFrames && R.moonFrames.length) {
-      mcv = R.moonFrames[Math.floor((t || 0) * 9) % R.moonFrames.length];
+      mcv = R.moonFrames[Math.floor((t || 0) * 2.5) % R.moonFrames.length];
     }
     if (mcv) {
       const mh = Math.max(2, Math.round(M.r * 2 * zs));
