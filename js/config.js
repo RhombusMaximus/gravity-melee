@@ -1,6 +1,6 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.40.0';
+  GM.VERSION = '0.41.0';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
@@ -24,12 +24,14 @@
   GM.PHYS = {
     dt: 1 / 60,
     // square arena: the planet sits dead centre, the playable disc has
-    // radius GM.W/2; the camera sees a slice of it
-    planet: { x: 2000, y: 2000, r: 180, GM: 8985600, rInf: 960, knee: 780, aCap: 2496 },
+    // radius GM.W/2; the camera sees a slice of it. v0.41: planet and
+    // moon scaled up together (180->260, 52->78) with the moon orbit and
+    // spawn ring, so worlds properly dwarf even the Precursor vessel
+    planet: { x: 2000, y: 2000, r: 260, GM: 8985600, rInf: 960, knee: 780, aCap: 2496 },
     arenaR: 1800,          // circular boundary radius from planet center
     arenaSoft: 1600,        // containment field kicks in at this radius
-    moon:   { r: 52, GM: 506880, rInf: 400, knee: 300, aCap: 1440, orbitR: 720, omega: 0.17 },
-    spawnR: 520,
+    moon:   { r: 78, GM: 506880, rInf: 400, knee: 300, aCap: 1440, orbitR: 1050, omega: 0.17 },
+    spawnR: 620,
     surgeAt: 170,
     surgeRate: 0.02,
     surgeMax: 3.0,

@@ -57,6 +57,9 @@ SHIP_SPRITES = {
     'utwig':     ('jugger-big-000.png',     'primary.wav',   'secondary.wav'),
     'vux':       ('intruder-big-000.png',   'primary.wav',   'secondary.wav'),
     'zoqfotpik': ('stinger-big-000.png',    'primary.wav',   'secondary.wav'),
+    # the Precursor capital ship (campaign flagship): one north-facing frame,
+    # drawn 2x the Dreadnought's in-game size; its own weapon sounds ride along
+    'flagship':   ('flagship-big-000.png',  'primary.wav',   'secondary.wav'),
 }
 
 # SC2 captain windows (sc2/src/uqm/status.c CaptainsWindow): 15 frames per

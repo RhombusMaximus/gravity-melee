@@ -35,7 +35,7 @@
         GM.A.SND.ui();
       } else if (e.code === 'Enter') {
         // 2D system flight: a planet in reach auto-selects, ENTER lands
-        if (H.view === '2d' && H.nearPlanet >= 0 && H.nearPlanetD < 700) {
+        if (H.view === '2d' && H.nearPlanet >= 0 && H.nearPlanetD < 900) {
           H.landSel = H.nearPlanet;
         }
         H.tryLand();
@@ -353,6 +353,12 @@
         const img = new Image(); img.src = uri; H.sun.push(img);
       }
     }
+    // the Precursor capital ship: the campaign flagship sprite, drawn
+    // at twice the Ur-Quan Dreadnought's in-game size
+    if (GM.CONTENT && GM.CONTENT.shipsprites && GM.CONTENT.shipsprites.flagship) {
+      H.precursorImg = new Image();
+      H.precursorImg.src = GM.CONTENT.shipsprites.flagship;
+    }
     // SC2 planet discs for the orbit view
     H.planetImgs = [];
     const P = (GM.CONTENT && GM.CONTENT.planets) || {};
@@ -506,7 +512,8 @@
     const nP = 3 + (stable(nm) % 4);
     const list = [];
     for (let i = 0; i < nP; i++) {
-      const oR = 380 + i * 330 + (stable(nm + i) % 160);
+      // v0.41: orbits scaled x1.6 — planets grew and must not overlap
+      const oR = 610 + i * 530 + (stable(nm + i) % 160);
       const spd = (0.05 + 0.035 * (i % 3)) * ((i % 2) ? 1 : -1);
       const phase = (stable(nm + 'p' + i) % 628) / 100;
       const img = (stable(nm + i) + i) % H.planetImgs.length;
@@ -547,20 +554,38 @@
   }
 
   function drawFlagship2D(g, cx, cy, yaw, sc, thrusting, t) {
+    // the PRECURSOR CAPITAL SHIP — the original flagship-big art drawn at
+    // twice the Dreadnought's in-game size (dreadnought-big is 29x33 at
+    // PS 2.25 = ~74px tall at zoom 1; flagship-big is 28x47 at 3.15 =
+    // ~148px). It is the only ship in the game the size of a small moon.
+    const img = H.precursorImg;
+    if (img && img.complete && img.naturalWidth) {
+      const k = 3.15;
+      const w = img.naturalWidth * k, hh = img.naturalHeight * k;
+      g.save();
+      g.translate(cx, cy);
+      g.rotate(yaw + Math.PI / 2);   // sprite faces north
+      g.imageSmoothingEnabled = false;
+      g.drawImage(img, -w / 2, -hh / 2, w, hh);
+      g.restore();
+      if (thrusting) {
+        const back = yaw + Math.PI;
+        const bx = cx + Math.cos(back) * (hh * 0.52 + 8);
+        const by = cy + Math.sin(back) * (hh * 0.52 + 8);
+        g.globalAlpha = 0.45 + 0.3 * Math.sin(t * 30);
+        g.fillStyle = '#ffca7a';
+        g.beginPath(); g.arc(bx, by, 16 + Math.random() * 10, 0, U.TAU); g.fill();
+        g.globalAlpha = 1;
+      }
+      return;
+    }
+    // fallback: the 16-facing nav icon
     const fi = frame2D(yaw);
-    const img = H.flag[fi];
-    if (!img || !img.complete || !img.naturalWidth) return;
+    const nav = H.flag[fi];
+    if (!nav || !nav.complete || !nav.naturalWidth) return;
     const a = (GM.CONTENT.navsprites.flagship.a || [])[fi] || [8, 8];
     g.imageSmoothingEnabled = false;
-    g.drawImage(img, cx - a[0] * sc, cy - a[1] * sc, img.naturalWidth * sc, img.naturalHeight * sc);
-    if (thrusting) {
-      const bx = cx - Math.cos(yaw) * 16 * sc * 0.25;
-      const by = cy - Math.sin(yaw) * 16 * sc * 0.25;
-      g.globalAlpha = 0.45 + 0.3 * Math.sin(t * 30);
-      g.fillStyle = '#ffca7a';
-      g.beginPath(); g.arc(bx, by, 5 * sc * 0.25 + Math.random() * 3, 0, U.TAU); g.fill();
-      g.globalAlpha = 1;
-    }
+    g.drawImage(nav, cx - a[0] * sc, cy - a[1] * sc, nav.naturalWidth * sc, nav.naturalHeight * sc);
   }
 
   // bake the original hyperspace twinkle: 16 tint steps per star frame,
@@ -854,7 +879,7 @@
     // the sun
     const simg = H.sun.length ? H.sun[Math.floor(t * 9) % H.sun.length] : null;
     if (simg && simg.complete && simg.naturalWidth > 0) {
-      const sc2 = 5;
+      const sc2 = 8;
       const w = simg.naturalWidth * sc2, h = simg.naturalHeight * sc2;
       const grd = g.createRadialGradient(sunX, sunY, w * 0.2, sunX, sunY, w * 1.6);
       grd.addColorStop(0, 'rgba(255,220,150,0.35)');
@@ -881,7 +906,7 @@
       const X = sxOf(px), Y = syOf(py);
       H.sysScr.push({ i: p.i, x: X, y: Y });
       const pim = H.planetImgs[p.img];
-      const dd = p.d * 0.6;
+      const dd = p.d * 1.5;   // v0.41: worlds dwarf even the Precursor vessel
       if (pim && pim.complete && pim.naturalWidth > 0) {
         g.imageSmoothingEnabled = false;
         g.drawImage(pim, X - dd / 2, Y - dd / 2, dd, dd);
@@ -906,7 +931,7 @@
             ' · LIFE ' + prof.life), X, Y + dd / 2 + 60);
           g.textAlign = 'left';
         }
-      } else if (H.nearPlanet === p.i && H.nearPlanetD < 700) {
+      } else if (H.nearPlanet === p.i && H.nearPlanetD < 900) {
         g.globalAlpha = 0.5 + 0.3 * Math.sin(t * 6);
         g.strokeStyle = '#3fc8ff'; g.lineWidth = 2;
         g.beginPath(); g.arc(X, Y, dd / 2 + 14, 0, U.TAU); g.stroke();
@@ -1084,7 +1109,7 @@
       g.stroke();
       g.globalAlpha = 1;
       const im = H.planetImgs[p.img];
-      const ds = U.clamp(2200 / pp[2], 3, 18);
+      const ds = U.clamp(3200 / pp[2], 4, 26);
       if (im && im.complete && im.naturalWidth > 0) {
         g.imageSmoothingEnabled = false;
         g.drawImage(im, pp[0] - ds / 2, pp[1] - ds / 2, ds, ds);
