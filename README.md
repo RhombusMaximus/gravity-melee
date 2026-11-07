@@ -256,11 +256,36 @@ well: crew, battery, regen, Super Melee point costs and weapon damage.
 And the Pkunk Fury keeps its signature: it taunts mid-battle with the
 original 14 combat insults.
 
-**Planet graphics, melee sound effects, ship sprites, music, captain
-window animations and panel icons are Star Control II content,
-© Toys for Bob, distributed via The Ur-Quan Masters, licensed
-CC BY-NC-SA 2.5** — see `assets/LICENSE-content.md`. Everything else in
-this repository is MIT. The game is and remains noncommercial.
+### The people who made all of this possible
+
+**Star Control II** was created by **Fred Ford** (programming &
+technology) and **Paul Reiche III** (game design and fiction) at
+**Toys for Bob**, published by Accolade in 1992 (3DO version 1994).
+Every ship, sprite, sound, planet, star and song in this game is their
+work and their team's — art and animation by George Barr, Paul Reiche
+III, Erol Otus, Greg Johnson, Kyle Balda, Jeff Rianda, Taunya Shiffer,
+Leonard Robel, Greg Hammond, Armand Cabrera and Silicon Knights;
+additional writing by Greg Johnson and Mat Genser; and the whole 3DO
+voice cast.
+
+**The Ur-Quan Masters** — the open-source port this project
+reverse-engineers — was built by the core team of **Serge van den Boom,
+Mika Kolehmainen, Michael Chapman Martin, Chris Nelson and Alex
+Volkov**, with additional programming by Geoffrey Hausheer and Nicolas
+Simonds, and music remixes by Jouni Airaksinen, Tore Aune Fjellstad,
+Espen Götzschmann, Aaron J. Grier, Dan Nicholson, George Nowik, Riku
+Nuottajärvi and Erol Otus.
+
+> *"We worship these two higher beings for making the original,
+> legendary game: Fred Ford, Paul Reiche III."* — `sc2/AUTHORS`
+
+The in-game **[C] CREDITS** screen (title menu) rolls the complete
+credits, extracted verbatim from the UQM tree's `AUTHORS` file.
+
+**All Star Control II content is © Toys for Bob, distributed via The
+Ur-Quan Masters, licensed CC BY-NC-SA 2.5** — see
+`assets/LICENSE-content.md`. Everything else in this repository is MIT.
+The game is and remains noncommercial — a fan homage.
 
 ## License
 

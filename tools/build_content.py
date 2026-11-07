@@ -157,6 +157,21 @@ LANDER_BIO = ['lifea', 'lifeb', 'lifec', 'lifed', 'lifee', 'lifef',
 LANDER_WAVS = ['awa', 'bit', 'can', 'die', 'ful', 'get', 'hit', 'hot',
                'hrt', 'lau', 'lig', 'qua', 'sht']
 
+def credits_from_authors(raw):
+    """Split sc2/AUTHORS verbatim into the port + original-game blocks."""
+    lines = [ln.rstrip() for ln in raw.splitlines()]
+    def find(marker):
+        for i, ln in enumerate(lines):
+            if ln.strip().startswith(marker):
+                return i
+        return -1
+    pi = find('The Ur-Quan Masters port:')
+    oi = find('Original game:')
+    opener = [ln.strip() for ln in lines[:pi] if ln.strip()]
+    port = [ln.strip() for ln in lines[pi + 1:oi] if ln.strip() and not set(ln.strip()) <= set('- ')]
+    orig = [ln.strip() for ln in lines[oi + 1:] if ln.strip() and not set(ln.strip()) <= set('- ')]
+    return opener, port, orig
+
 # The full UQM tracker soundtrack, played by our own miniprotracker
 # (js/protracker.js) on the standalone music.html jukebox page.
 # (group, path under content/base, display name) — exported raw to
@@ -413,6 +428,18 @@ def main():
         b64 = base64.b64encode(raw).decode()
         parts.append(f"        land_{w}: 'data:audio/wav;base64,{b64}',\n")
     parts.append('      },\n')
+    parts.append('    },\n')
+    parts.append('    credits: {\n')
+    authors_raw = git_show(repo, ref, 'sc2/AUTHORS').decode('utf-8', 'replace')
+    opener, port, orig = credits_from_authors(authors_raw)
+    def emit_lines(name, arr):
+        parts.append(f'      {name}: [\n')
+        for ln in arr:
+            parts.append('        ' + json.dumps(ln) + ',\n')
+        parts.append('      ],\n')
+    emit_lines('opener', opener)
+    emit_lines('port', port)
+    emit_lines('original', orig)
     parts.append('    },\n')
     parts.append('    license: "CC BY-NC-SA 2.5 -- Star Control II content (c) Toys for Bob, via The Ur-Quan Masters",\n')
     parts.append('  };\n})(window.GM);\n')

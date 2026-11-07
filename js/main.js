@@ -89,6 +89,12 @@
         GM.A.startMusic('hyper');
       }
       else if (c === 'KeyO') { window.location.href = 'music.html'; }
+      else if (c === 'KeyC') { GM.credT0 = GM.clockT || 0; GM.state = 'credits'; }
+      return;
+    }
+
+    if (GM.state === 'credits') {
+      if (c === 'Escape' || c === 'KeyC') GM.state = 'title';
       return;
     }
 
@@ -429,6 +435,12 @@
     if (sh > 0.1) g.translate(U.rand(-sh, sh) | 0, U.rand(-sh, sh) | 0);
 
     // ===== WORLD LAYER (#cv, 2304x1296) =====
+    if (GM.state === 'credits') {
+      GM.R.drawCredits(g, t);
+      g.restore();
+      hg.clearRect(0, 0, GM.VW, GM.VH);
+      return;
+    }
     if (GM.state === 'hyper') {
       if (GM.HYPER.land && GM.LANDER) {
         GM.LANDER.drawWorld(g, t);

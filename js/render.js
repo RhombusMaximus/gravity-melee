@@ -964,16 +964,77 @@
     if (blink) {
       g.font = 'bold 11px monospace';
       g.fillStyle = '#fff';
-      g.fillText('PRESS  1 · 2 · 3  TO ASSEMBLE A FLEET', GM.VW / 2, 150);
+      g.fillText('PRESS  1 · 2  TO ASSEMBLE A FLEET', GM.VW / 2, 150);
     }
     g.font = '8px monospace';
     g.fillStyle = '#55688a';
     g.fillText('[1] 1v1 · 30 pts    [2] 2v2 · 50 pts', GM.VW / 2, 168);
-    g.fillText('[4] HYPERSPACE — the 3D star map    [5] SURVIVAL    [O] SOUNDTRACK', GM.VW / 2, 182);
+    g.fillText('[4] HYPERSPACE — the star map    [5] SURVIVAL    [O] SOUNDTRACK    [C] CREDITS', GM.VW / 2, 182);
     g.fillText('F take helm (your team) · WASD fly · Q/E strafe · SPACE fire · SHIFT special', GM.VW / 2, 196);
     g.fillText('TAB cycle targets · X release helm · C wingmen focus fire · G minds · P pause · M mute · [ ] volume', GM.VW / 2, 210);
     g.fillStyle = '#3c4a66';
-    g.fillText('v' + GM.VERSION + ' — a love letter to Star Control II melee', GM.VW / 2, GM.VH - 14);
+    g.fillText('an homage to STAR CONTROL II — created by Fred Ford & Paul Reiche III, Toys for Bob (1992)', GM.VW / 2, GM.VH - 26);
+    g.fillText('all content via The Ur-Quan Masters open-source port — (c) Toys for Bob · CC BY-NC-SA 2.5', GM.VW / 2, GM.VH - 14);
+    g.textAlign = 'left';
+  };
+
+  // ---------- credits roll (title: [C]) ----------
+  R.drawCredits = (g, t) => {
+    const C = GM.CONTENT && GM.CONTENT.credits;
+    g.fillStyle = '#04060c';
+    g.fillRect(0, 0, GM.WV, GM.WH);
+    if (!C) {
+      g.fillStyle = '#8fa2c0';
+      g.font = '20px monospace';
+      g.textAlign = 'center';
+      g.fillText('credits content missing', GM.WV / 2, GM.WH / 2);
+      g.textAlign = 'left';
+      return;
+    }
+    if (!R.creditRoll) {
+      const roll = [];
+      const push = (text, kind) => roll.push({ text, kind });
+      push('GRAVITY MELEE', 'title');
+      push('a fan homage — every ship, sprite, sound and song in this game is theirs', 'sub');
+      push('', 'gap');
+      push('THE ORIGINAL GAME — STAR CONTROL II (1992) · TOYS FOR BOB', 'section');
+      for (const ln of C.original) push(ln, ln.endsWith(':') ? 'hdr' : 'name');
+      push('', 'gap');
+      push('THE UR-QUAN MASTERS — THE OPEN-SOURCE PORT (2002)', 'section');
+      for (const ln of C.opener) push(ln, ln.startsWith('We worship') ? 'sub' : 'name');
+      for (const ln of C.port) push(ln, ln.endsWith(':') ? 'hdr' : 'name');
+      push('', 'gap');
+      push('All Star Control II content (c) Toys for Bob, distributed via', 'sub');
+      push('The Ur-Quan Masters under CC BY-NC-SA 2.5. This is a free,', 'sub');
+      push('noncommercial fan project — thank you all for keeping the', 'sub');
+      push('galaxy alive for the rest of us.', 'sub');
+      push('', 'gap');
+      push('Thank you, Fred and Paul.', 'title');
+      R.creditRoll = roll;
+    }
+    const roll = R.creditRoll;
+    const LH = { title: 84, section: 70, hdr: 52, name: 42, sub: 42, gap: 34 };
+    const FONT = { title: 'bold 60px monospace', section: 'bold 38px monospace',
+      hdr: 'bold 27px monospace', name: '25px monospace', sub: '25px monospace' };
+    const COL = { title: '#f4f8ff', section: '#e8b84b', hdr: '#cfe0ff', name: '#9aa7bd', sub: '#8fa2c0' };
+    const offs = [];
+    let acc = 0;
+    for (const e of roll) { offs.push(acc); acc += LH[e.kind]; }
+    const total = acc + GM.WH + 400;
+    const speed = 95;
+    const el = (((t - (GM.credT0 || t)) * speed) % total + total) % total;
+    g.textAlign = 'center';
+    for (let i = 0; i < roll.length; i++) {
+      const y = GM.WH + 80 - el + offs[i];
+      if (y < -80 || y > GM.WH + 100) continue;
+      const e = roll[i];
+      g.font = FONT[e.kind];
+      g.fillStyle = COL[e.kind];
+      g.fillText(e.text, GM.WV / 2, y);
+    }
+    g.fillStyle = '#55688a';
+    g.font = '20px monospace';
+    g.fillText('v' + GM.VERSION + '  ·  [ESC] back', GM.WV / 2, GM.WH - 24);
     g.textAlign = 'left';
   };
 
