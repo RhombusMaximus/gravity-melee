@@ -91,6 +91,9 @@ EXTRA_WAVS = {
 NAV_SETS = {
     'flagship': ('nav', 'flagship', 16),        # the 16-facing map icon
     'sun': ('nav', 'truespacesun', 5),          # animated system-view sun
+    'hyperstars': ('nav', 'hyperstars', 32),    # the hyperspace background stars
+    'ambient': ('nav', 'ambient', 97),          # 1x1 color-cycling ramp (the twinkle)
+    'orbitenter': ('nav', 'orbitenter', 1),     # the system-entry gateway art
 }
 
 # extra per-ship sprites: the Mmrnmhrm Y-Form shape + the Orz howitzer turret

@@ -22,6 +22,10 @@
     k[e.code] = true;
     if (GM.state !== 'hyper') return;
     if (H.land) return;                 // the lander owns all keys while landed
+    if (H.dive) {
+      if (e.code === 'Escape') H.dive = null;   // abort the plunge
+      return;
+    }
     if (H.sys !== null) {
       // orbit view: TAB cycles planets, ENTER lands, ESC backs out
       if (e.code === 'Tab') {
@@ -376,11 +380,29 @@
         r: 100 + rnd2() * 300, a: 0.05 + rnd2() * 0.09 });
     }
     H.z2d = 0.26; H.nearPlanet = -1; H.nearPlanetD = Infinity;
+    H.dive = null;   // the gravity-well plunge into a system
+    // the ORIGINAL hyperspace starfield assets: hyperstars sprites +
+    // the ambient color-cycling ramp + the orbitenter gateway art
+    const navC = GM.CONTENT && GM.CONTENT.navsprites;
+    if (navC && navC.hyperstars && navC.ambient) {
+      H.hstarImgs = navC.hyperstars.f.map((u) => { const i = new Image(); i.src = u; return i; });
+      H.ambientImgs = navC.ambient.f.map((u) => { const i = new Image(); i.src = u; return i; });
+      H.orbitEnterImg = navC.orbitenter
+        ? (() => { const i = new Image(); i.src = navC.orbitenter.f[0]; return i; })() : null;
+      const rnd3 = prng(19921211);   // scatter seeded with the SC2 release date
+      H.bgStars = [];
+      for (let i = 0; i < 130; i++) {
+        H.bgStars.push({ x: rnd3() * 30000 - 15000, y: rnd3() * 30000 - 15000,
+          fr: [0, 5, 11, 17, 23, 28][i % 6], sc: 1 + rnd3() * 1.3, ph: rnd3() * 16 });
+      }
+    }
+    H.hyperBaked = false;
   };
 
   H.update = (dt) => {
     H.t += dt;
-    if (H.view === '2d') { H.update2D(dt); return; }
+    if (H.view === '2d') { H.update2D(dt); return; }   // update2D owns the dive tick
+    if (H.dive) return;   // (3D view) nothing flies during the plunge
     H.zoomCur += (H.zoom - H.zoomCur) * (1 - Math.pow(0.01, dt));
     if (H.sys !== null) return;   // in the orbit view nothing flies
     const s = H.ship;
@@ -444,9 +466,7 @@
   H.activate = () => {
     if (H.sys !== null || H.warp) return;
     if (H.near >= 0 && H.nearD < ENTER_RANGE) {
-      H.sys = H.near;
-      H.landSel = -1;
-      GM.A.startMusic('orbit');
+      H.dive = { i: H.near, t: 0, dur: 1.9 };   // plunge instead of instant entry
       return;
     }
     if (H.sel === null || H.sel < 0) {
@@ -456,7 +476,7 @@
     const st = GM.STARS[H.sel];
     const dx = st[2] - H.ship.x, dy = st[3] - H.ship.y, dz = st[4] - H.ship.z;
     const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    if (d < ENTER_RANGE) { H.sys = H.sel; H.landSel = -1; GM.A.startMusic('orbit'); return; }
+    if (d < ENTER_RANGE) { H.dive = { i: H.sel, t: 0, dur: 1.9 }; return; }
     const cost = Math.ceil(d / 1500);
     if (H.fuel < cost) return;   // not enough fuel — the warp doesn't fire
     H.startWarp(H.sel);
@@ -543,8 +563,62 @@
     }
   }
 
+  // bake the original hyperspace twinkle: 16 tint steps per star frame,
+  // tinted by the ambient color-cycling ramp (source-atop on a DEDICATED
+  // offscreen — never on the shared world canvas)
+  function bakeHyperStars() {
+    if (!H.ambientImgs || !H.hstarImgs) return false;
+    const rc = document.createElement('canvas');
+    rc.width = 1; rc.height = 1;
+    const rg = rc.getContext('2d');
+    const ramp = [];
+    for (const im of H.ambientImgs) {
+      if (!im.complete || !im.naturalWidth) return false;
+      rg.clearRect(0, 0, 1, 1);
+      rg.drawImage(im, 0, 0);
+      const d = rg.getImageData(0, 0, 1, 1).data;
+      ramp.push([d[0], d[1], d[2]]);
+    }
+    const bakes = [];
+    for (const fr of [0, 5, 11, 17, 23, 28]) {
+      const src = H.hstarImgs[fr];
+      if (!src.complete || !src.naturalWidth) return false;
+      const steps = [];
+      for (let s = 0; s < 16; s++) {
+        const c = document.createElement('canvas');
+        c.width = src.naturalWidth; c.height = src.naturalHeight;
+        const cg = c.getContext('2d');
+        cg.imageSmoothingEnabled = false;
+        cg.drawImage(src, 0, 0);
+        const col = ramp[Math.floor(s * ramp.length / 16) % ramp.length];
+        cg.globalCompositeOperation = 'source-atop';
+        cg.globalAlpha = 0.45;
+        cg.fillStyle = 'rgb(' + col[0] + ',' + col[1] + ',' + col[2] + ')';
+        cg.fillRect(0, 0, c.width, c.height);
+        steps.push(c);
+      }
+      bakes.push(steps);
+    }
+    H.starBake = bakes;
+    H.ambientRamp = ramp;
+    return true;
+  }
+
   H.update2D = (dt) => {
     const s = H.ship;
+    // the gravity-well plunge: camera falls into the target star, then
+    // the system view opens (ESC aborts)
+    if (H.dive) {
+      H.dive.t += dt;
+      GM.FX.addShake(2.4 * dt);   // the plunge rumble
+      if (H.dive.t >= H.dive.dur) {
+        H.sys = H.dive.i;
+        H.landSel = -1;
+        H.dive = null;
+        GM.A.startMusic('orbit');
+      }
+      return;
+    }
     // campaign clock: 30s = 1 day, in hyperspace and in-system alike
     H.dayT += dt;
     if (H.dayT >= 30) { H.dayT -= 30; H.days++; }
@@ -592,21 +666,53 @@
   H.drawWorld2D = (g, t) => {
     g.fillStyle = '#150906';   // hyperspace: deep red, like the original
     g.fillRect(0, 0, GM.WV, GM.WH);
-    const s = H.ship, z = H.z2d;
+    // bake the original starfield once the nav assets decode
+    if (!H.hyperBaked && !H.baking) H.hyperBaked = bakeHyperStars();
+    const s = H.ship;
+    // the plunge: during a dive the camera falls into the target star —
+    // the zoom ramps and the camera center slides from ship to star
+    let dv = null, zMul = 1, camX = s.x, camY = s.y;
+    if (H.dive) {
+      const st = GM.STARS[H.dive.i];
+      const p = Math.min(1, H.dive.t / H.dive.dur);
+      zMul = 1 + (p * p) * 11;
+      const cp = Math.min(1, p * 1.45);
+      camX = s.x + (st[2] - s.x) * cp;
+      camY = s.y + (st[3] - s.y) * cp;
+      dv = { p, st };
+    }
+    const z = H.z2d * zMul;
     const CW = GM.WV / 2, CH = GM.WH / 2;
-    const sxOf = (wx) => CW + (wx - s.x) * z;
-    const syOf = (wy) => CH + (wy - s.y) * z;
+    const sxOf = (wx) => CW + (wx - camX) * z;
+    const syOf = (wy) => CH + (wy - camY) * z;
 
-    // nebula layer (0.35 parallax against the map)
+    // nebula layer (0.35 parallax)
     for (const n of H.neb2) {
-      const nx = CW + (n.x - s.x * 0.35) * z;
-      const ny = CH + (n.y - s.y * 0.35) * z;
+      const nx = CW + (n.x - camX * 0.35) * z;
+      const ny = CH + (n.y - camY * 0.35) * z;
       if (nx < -n.r || nx > GM.WV + n.r || ny < -n.r || ny > GM.WH + n.r) continue;
       g.globalAlpha = n.a;
       g.fillStyle = '#6e1f0e';
       g.beginPath(); g.arc(nx, ny, n.r * z * 4, 0, U.TAU); g.fill();
     }
     g.globalAlpha = 1;
+
+    // the ORIGINAL hyperspace background stars (nav/hyperstars sprites,
+    // twinkling through the ambient color-cycling ramp)
+    if (H.hyperBaked && H.starBake) {
+      for (const b of H.bgStars) {
+        const nx = CW + (b.x - camX * 0.6) * z;
+        const ny = CH + (b.y - camY * 0.6) * z;
+        if (nx < -60 || nx > GM.WV + 60 || ny < -60 || ny > GM.WH + 60) continue;
+        const bake = H.starBake[b.fr % H.starBake.length];
+        if (!bake) continue;
+        const im = bake[Math.floor(t * 10 + b.ph) % 16];
+        const sc = b.sc * (z / H.z2d) * 2.2;
+        g.imageSmoothingEnabled = false;
+        g.drawImage(im, nx - im.width * sc / 2, ny - im.height * sc / 2,
+          im.width * sc, im.height * sc);
+      }
+    }
 
     // constellation lines
     g.strokeStyle = '#3a1e2c';
@@ -642,14 +748,24 @@
         g.beginPath(); g.arc(x, y, rad * 2.2, 0, U.TAU); g.fill();
         g.globalAlpha = 1;
       }
-      if (warpK > 0.05) {
-        // warp streaks: stars stretch opposite the travel direction
-        g.globalAlpha = 0.55 * warpK;
+      if (warpK > 0.05 || dv) {
+        // warp streaks stretch stars opposite the travel direction; during
+        // the dive everything streaks radially AWAY from the target star
+        let ax, ay, k;
+        if (dv) {
+          const tx2 = sxOf(dv.st[2]), ty2 = syOf(dv.st[3]);
+          ax = Math.atan2(y - ty2, x - tx2);
+          k = dv.p * dv.p * 280;
+        } else {
+          ax = warpAng + Math.PI;
+          k = 110 * warpK;
+        }
+        g.globalAlpha = 0.55 * (dv ? dv.p : warpK);
         g.strokeStyle = col;
         g.lineWidth = Math.max(1, rad * 0.8);
         g.beginPath();
         g.moveTo(x, y);
-        g.lineTo(x - Math.cos(warpAng) * 110 * warpK, y - Math.sin(warpAng) * 110 * warpK);
+        g.lineTo(x + Math.cos(ax) * k, y + Math.sin(ax) * k);
         g.stroke();
         g.globalAlpha = 1;
       }
@@ -685,6 +801,39 @@
       g.fillText(L.n, L.x + 10, L.y - 9);
     }
     g.globalAlpha = 1;
+
+    // the plunge overlay: vortex swirls, the original orbitenter gateway
+    // art swelling at the bottom of the gravity well, then the flash
+    if (dv) {
+      const tx = sxOf(dv.st[2]), ty = syOf(dv.st[3]);
+      g.strokeStyle = 'rgba(255,120,60,' + (0.4 * dv.p) + ')';
+      g.lineWidth = 3;
+      for (let a = 0; a < 3; a++) {
+        g.beginPath();
+        for (let kk = 0; kk <= 30; kk++) {
+          const ang = t * (2 + dv.p * 7) + a * 2.09 + kk * 0.22;
+          const rr = (30 + kk * (7 + dv.p * 26)) * (0.5 + dv.p * 2.2);
+          const px = tx + Math.cos(ang) * rr;
+          const py = ty + Math.sin(ang) * rr * 0.82;
+          if (kk === 0) g.moveTo(px, py); else g.lineTo(px, py);
+        }
+        g.stroke();
+      }
+      g.lineWidth = 1;
+      if (dv.p > 0.5 && H.orbitEnterImg && H.orbitEnterImg.complete && H.orbitEnterImg.naturalWidth) {
+        const oa = (dv.p - 0.5) / 0.5;
+        const ow = H.orbitEnterImg.naturalWidth * (2.5 + oa * 9);
+        const oh = H.orbitEnterImg.naturalHeight * (2.5 + oa * 9);
+        g.globalAlpha = Math.min(0.95, oa);
+        g.imageSmoothingEnabled = false;
+        g.drawImage(H.orbitEnterImg, tx - ow / 2, ty - oh / 2, ow, oh);
+        g.globalAlpha = 1;
+      }
+      if (dv.p > 0.88) {
+        g.fillStyle = 'rgba(255,255,255,' + ((dv.p - 0.88) / 0.12) + ')';
+        g.fillRect(0, 0, GM.WV, GM.WH);
+      }
+    }
 
     // the flagship, fixed at view center (the map scrolls under it)
     drawFlagship2D(g, CW, CH, s.yaw, 4, (k['KeyW'] || k['ArrowUp'] || H.warp), t);
@@ -769,8 +918,8 @@
   };
 
   // ---- compact 3D scenes for the inset mini-map (our old chase-cam) ----
-  function drawChevron(g, t, proj, s, warpK) {
-    const r = 14;
+  function drawChevron(g, t, proj, s, warpK, r) {
+    r = r || 14;
     const sv = [
       [r * 1.3, 0, 0],
       [-r * 0.55, r * 0.85, -r * 0.15],
@@ -868,23 +1017,40 @@
       }
     }
     g.globalAlpha = 1;
-    // stars
-    const warpK = H.warp ? Math.sin(Math.min(1, H.warp.t / H.warp.dur) * Math.PI) : 0;
+    // stars — MUCH bigger: the inset is a mini-map, every star must read
+    const warpK2 = H.warp ? Math.sin(Math.min(1, H.warp.t / H.warp.dur) * Math.PI) : 0;
     for (let i = 0; i < GM.STARS.length; i++) {
       const st = GM.STARS[i];
       const p = proj(st[2], st[3], st[4]);
       if (!p || p[0] < -10 || p[0] > W + 10 || p[1] < -10 || p[1] > Hh + 10) continue;
-      const fog = U.clamp(1 - p[2] / 26000, 0.12, 1);
-      const base = st[6] === 3 ? 7.5 : (st[6] === 2 ? 4.6 : 2.6);
-      const rad = U.clamp(base * 900 / p[2], 0.8, 5) * (W / GM.WV);
+      const fog = U.clamp(1 - p[2] / 30000, 0.2, 1);
+      const rad = (st[6] === 3 ? 7 : st[6] === 2 ? 4.6 : 2.8) * fog;
       const col = COLMAP[st[5]] || '#fff';
+      if (warpK2 > 0.1) {
+        g.globalAlpha = 0.6 * warpK2;
+        g.strokeStyle = col;
+        g.lineWidth = Math.max(1, rad * 0.6);
+        g.beginPath();
+        g.moveTo(p[0], p[1]);
+        g.lineTo(p[0] + (p[0] - W / 2) * 0.4 * warpK2, p[1] + (p[1] - Hh / 2) * 0.4 * warpK2);
+        g.stroke();
+        g.globalAlpha = 1;
+      }
       g.globalAlpha = fog;
       g.fillStyle = col;
       g.beginPath(); g.arc(p[0], p[1], rad, 0, U.TAU); g.fill();
+      if (i === H.sel) {
+        g.globalAlpha = 0.9;
+        g.strokeStyle = '#fff';
+        g.lineWidth = 1.5;
+        g.beginPath(); g.arc(p[0], p[1], rad + 4, 0, U.TAU); g.stroke();
+        g.globalAlpha = 1;
+        g.lineWidth = 1;
+      }
     }
     g.globalAlpha = 1;
     // the ship
-    drawChevron(g, t, proj, H.ship, warpK);
+    drawChevron(g, t, proj, H.ship, warpK2, 20);
   };
 
   H.sceneSys3D = (g, t, W, Hh) => {
@@ -918,13 +1084,19 @@
       g.stroke();
       g.globalAlpha = 1;
       const im = H.planetImgs[p.img];
-      const ds = U.clamp(1600 / pp[2], 2, 14);
+      const ds = U.clamp(2200 / pp[2], 3, 18);
       if (im && im.complete && im.naturalWidth > 0) {
         g.imageSmoothingEnabled = false;
         g.drawImage(im, pp[0] - ds / 2, pp[1] - ds / 2, ds, ds);
       }
+      if (p.i === H.landSel) {
+        g.strokeStyle = '#fff';
+        g.lineWidth = 1.5;
+        g.beginPath(); g.arc(pp[0], pp[1], ds * 0.7, 0, U.TAU); g.stroke();
+        g.lineWidth = 1;
+      }
     }
-    drawChevron(g, t, proj, H.ship, 0);
+    drawChevron(g, t, proj, H.ship, 0, 20);
   };
 
   // ---- rendering ----
@@ -1304,14 +1476,14 @@
     const IY = MY + MW + 8;
     if (!H.insCv) {
       H.insCv = document.createElement('canvas');
-      H.insCv.width = 240; H.insCv.height = 180;
+      H.insCv.width = 240; H.insCv.height = 300;
     }
     const ig = H.insCv.getContext('2d');
-    if (H.sys !== null) H.sceneSys3D(ig, t, 240, 180);
-    else H.scene3D(ig, t, 240, 180);
-    g.drawImage(H.insCv, MX, IY, MW, 90);
+    if (H.sys !== null) H.sceneSys3D(ig, t, 240, 300);
+    else H.scene3D(ig, t, 240, 300);
+    g.drawImage(H.insCv, MX, IY, MW, 150);
     g.strokeStyle = '#1b2438';
-    g.strokeRect(MX, IY, MW, 90);
+    g.strokeRect(MX, IY, MW, 150);
     g.font = '7px monospace';
     g.fillStyle = '#55688a';
     g.fillText('3D VIEW', MX + 2, IY + 8);
