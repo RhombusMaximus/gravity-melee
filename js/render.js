@@ -779,29 +779,8 @@
       g.fillText('RNG ' + Math.round(dist) + '  CLOSING ' + closing.toFixed(1), GM.VW - 8, 6 + t1.length * CARD_H + 10);
     }
 
-    // ===== TEAM ROSTER (bottom left) =====
-    g.font = '8px monospace';
-    g.textAlign = 'left';
-    let ry = GM.VH - 8;
-    for (let ti = world.teams.length - 1; ti >= 0; ti--) {
-      const teamShips = world.teams[ti];
-      const T = GM.TEAMS[ti];
-      for (let i = teamShips.length - 1; i >= 0; i--) {
-        const s = teamShips[i];
-        ry -= 9;
-        g.fillStyle = s.dead ? '#39404f' : T.P;
-        g.fillRect(8, ry, 4, 4);
-        g.fillStyle = s.dead ? '#39404f' : '#8fa2c0';
-        let tag = s.dead ? ' ✝' : '';
-        if (s.human) tag = ' ◆';
-        else if (GM.world && GM.world.p1 === s) tag = ' ★';
-        else if (GM.playerTeam !== null && GM.playerTeam !== undefined && s.team === GM.playerTeam) tag = ' ▸';
-        g.fillText(s.name + tag, 15, ry + 4);
-      }
-      ry -= 3;
-    }
-
-    // ===== MINIMAP (bottom right) =====
+    // ===== MINIMAP (bottom center — the roster list retired in v0.43;
+    // the pilot cards on the left/right edges carry that information) =====
     R.drawMinimap(g, world);
 
     // ===== TOP CENTER: timer / surge / mode =====
@@ -832,7 +811,7 @@
   // ---------- minimap ----------
   R.drawMinimap = (g, world) => {
     const mw = 80, mh = 80;   // square minimap for the square arena
-    const mx = GM.VW - mw - 6, my = GM.VH - mh - 10;
+    const mx = (GM.VW - mw) / 2, my = GM.VH - mh - 10;   // bottom center (v0.43)
     g.fillStyle = 'rgba(4,6,12,0.72)';
     g.fillRect(mx, my, mw, mh);
     g.strokeStyle = '#1b2438';
