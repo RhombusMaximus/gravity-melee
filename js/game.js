@@ -10,6 +10,14 @@
   const SHOT_GRAV = { dart: 0.25, bolt: 0.3, plasma: 0.8, shot: 0.25, lob: 1.0, pellet: 0.25, fusion: 0.35, missile: 0.4 };
   const S2 = GM.SCALE;
 
+  // asteroid tiers: size 2 = big (fragments to 2 medium), 1 = medium
+  // (fragments to 2 small), 0 = small (destroyed outright)
+  const ROCK = [
+    { r: 13, hp: 3 },
+    { r: 24, hp: 6 },
+    { r: 42, hp: 12 },
+  ];
+
   class World {
     constructor(mode, opts) {
       this.mode = mode;
@@ -22,6 +30,9 @@
       this.winner = null;      // null = ongoing, -1 = draw, else team idx
       this.ships = [];
       this.explosions = [];   // active boom animations
+      this.rings = [];         // expanding shockwave rings (explosion beauty)
+      this.rocks = [];         // asteroids: big -> medium -> small
+      this.spawnRocks();
       this.sats = [];         // orbiting zap satellites (Chmmr Avatar)
       this.pdBeams = [];       // point-defense laser beams (visual)
       this.rebirths = [];      // Pkunk rebirth rainbow effects
@@ -163,7 +174,7 @@
         vy: ship.vy * 0.35 + Math.sin(ang) * w.speed,
         life: w.life, team: ship.team, dmg: w.dmg, size: w.size,
         kind: w.kind, aoe: w.aoe || 0, by: ship,
-        wspr: w.wspr || ship.spec.wspr || ship.spec.cap,
+        wspr: w.wspr !== undefined ? w.wspr : (ship.spec.wspr || ship.spec.cap),
         col: SHOT_COL[w.kind] || '#fff',
         grav: SHOT_GRAV[w.kind] !== undefined ? SHOT_GRAV[w.kind] : 0.3,
         turn: w.turn || 0, tgt: null, retgtT: 0,
@@ -188,12 +199,17 @@
 
     spawnMissile(ship) {
       const sp = ship.spec.special;
+      // B.U.T.T.: the Spathi's rear-fired homing missile (spathi.c
+      // spawn_butt_missile — face = ShipFacing + HALF_CIRCLE, offset behind)
+      const rear = !!sp.rear;
+      const fireAng = rear ? ship.ang + Math.PI : ship.ang;
+      const off = rear ? ship.r + 4 : ship.r + 3;
       this.missiles.push({
-        x: ship.x + Math.cos(ship.ang) * (ship.r + 3),
-        y: ship.y + Math.sin(ship.ang) * (ship.r + 3),
-        vx: ship.vx * 0.4 + Math.cos(ship.ang) * sp.speed,
-        vy: ship.vy * 0.4 + Math.sin(ship.ang) * sp.speed,
-        ang: ship.ang, team: ship.team, dmg: sp.dmg, life: sp.life,
+        x: ship.x + Math.cos(fireAng) * off,
+        y: ship.y + Math.sin(fireAng) * off,
+        vx: ship.vx * 0.4 + Math.cos(fireAng) * sp.speed,
+        vy: ship.vy * 0.4 + Math.sin(fireAng) * sp.speed,
+        ang: fireAng, team: ship.team, dmg: sp.dmg, life: sp.life,
         turn: sp.turn, by: ship, retgtT: 0, tgt: null,
       });
     }
@@ -228,6 +244,64 @@
       return out;
     }
 
+    // expanding shockwave ring (explosion beauty)
+    ring(x, y, r1, dur, col, width) {
+      this.rings.push({ x, y, r0: 6, r1, t: 0, dur, col: col || '#ffd9a0', w: width || 2 });
+    }
+
+    spawnRocks() {
+      // a small asteroid belt per match: 4 big, 2 medium, drifting slowly.
+      // Kept clear of the planet and the ship spawn ring.
+      this.rocks = [];
+      const P = GM.PHYS.planet;
+      const drop = (size) => {
+        for (let tries = 0; tries < 40; tries++) {
+          const a = Math.random() * U.TAU;
+          const d = 1100 + Math.random() * 700;
+          const x = U.wrapX(P.x + Math.cos(a) * d), y = U.wrapY(P.y + Math.sin(a) * d);
+          if (U.len(x - P.x, y - P.y) < 1000) continue;
+          let clash = false;
+          for (const s of this.ships) if (U.len(x - s.x, y - s.y) < 500) { clash = true; break; }
+          if (clash) continue;
+          const ang = Math.random() * U.TAU, spd = 8 + Math.random() * 14;
+          this.rocks.push({
+            x, y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+            size, hp: ROCK[size].hp, r: ROCK[size].r * (0.85 + Math.random() * 0.3),
+            ang: Math.random() * U.TAU, spin: (Math.random() - 0.5) * 0.8,
+            seed: Math.floor(Math.random() * 1e9),
+          });
+          return;
+        }
+      };
+      for (let i = 0; i < 4; i++) drop(2);
+      for (let i = 0; i < 2; i++) drop(1);
+    }
+
+    breakRock(i, by) {
+      const rock = this.rocks[i];
+      const rk = ROCK[rock.size];
+      GM.A.SND.boom(rk.hp);
+      GM.FX.emit(rock.x, rock.y, 10 + rock.size * 8, { spd: 60 + rock.size * 25, life: 0.7, col: '#a89a80', size: 2 });
+      GM.FX.emit(rock.x, rock.y, 6 + rock.size * 4, { spd: 30, life: 0.5, col: '#6e6a5e', size: 1.5 });
+      this.ring(rock.x, rock.y, rock.r * 2.2, 0.4, '#c9b48a', 1.5);
+      // fragmentation: big -> 2 medium, medium -> 2 small, small -> gone
+      if (rock.size > 0) {
+        for (let k = 0; k < 2; k++) {
+          const a = Math.random() * U.TAU, sp = 20 + Math.random() * 18;
+          this.rocks.push({
+            x: U.wrapX(rock.x + Math.cos(a) * rock.r * 0.5),
+            y: U.wrapY(rock.y + Math.sin(a) * rock.r * 0.5),
+            vx: rock.vx + Math.cos(a) * sp, vy: rock.vy + Math.sin(a) * sp,
+            size: rock.size - 1, hp: ROCK[rock.size - 1].hp,
+            r: ROCK[rock.size - 1].r * (0.85 + Math.random() * 0.3),
+            ang: Math.random() * U.TAU, spin: (Math.random() - 0.5) * 1.2,
+            seed: Math.floor(Math.random() * 1e9),
+          });
+        }
+      }
+      this.rocks.splice(i, 1);
+    }
+
     explode(x, y, dmg, rad, by, kind) {
       GM.A.SND.boom(dmg);
       this.explosions.push({ x, y, t: 0, dur: 0.35, big: false });
@@ -245,6 +319,16 @@
           s.vx += n.x * 150 * k;
           s.vy += n.y * 150 * k;
           s.damage(dmg * k, by, this, kind || 'blast');
+        }
+      }
+      // blasts crack asteroids within the radius
+      for (let ri = this.rocks.length - 1; ri >= 0; ri--) {
+        const rock = this.rocks[ri];
+        const w = U.wrapDelta(x, y, rock.x, rock.y);
+        const d = U.len(w.x, w.y);
+        if (d < rad + rock.r) {
+          rock.hp -= dmg * Math.max(0.25, 1 - d / (rad + rock.r));
+          if (rock.hp <= 0) this.breakRock(ri, by);
         }
       }
       // blasts kill fighters too (single hit point)
@@ -408,6 +492,21 @@
             dead = true;
           }
         }
+        // asteroids eat shots: big -> medium -> small
+        if (!dead) {
+          for (let ri = this.rocks.length - 1; ri >= 0; ri--) {
+            const rock = this.rocks[ri];
+            const w = U.wrapDelta(sh.x, sh.y, rock.x, rock.y);
+            if (U.len(w.x, w.y) < rock.r + sh.size * 0.5) {
+              rock.hp -= sh.dmg;
+              GM.FX.emit(sh.x, sh.y, 4, { spd: 50, life: 0.35, col: '#a89a80', size: 1.5 });
+              if (sh.aoe) this.explode(sh.x, sh.y, sh.dmg, sh.aoe, sh.by, 'blast');
+              if (rock.hp <= 0) this.breakRock(ri, sh.by);
+              dead = true;
+              break;
+            }
+          }
+        }
         // ships
         if (!dead) {
           for (const s of this.ships) {
@@ -481,6 +580,20 @@
         if (U.len(pd.x, pd.y) < P.r) { this.explode(ms.x, ms.y, ms.dmg * 0.6, 16, ms.by, 'blast'); dead = true; }
         const md = U.wrapDelta(ms.x, ms.y, mp.x, mp.y);
         if (!dead && U.len(md.x, md.y) < M.r) { this.explode(ms.x, ms.y, ms.dmg * 0.6, 16, ms.by, 'blast'); dead = true; }
+        // asteroids
+        if (!dead) {
+          for (let ri = this.rocks.length - 1; ri >= 0; ri--) {
+            const rock = this.rocks[ri];
+            const w = U.wrapDelta(ms.x, ms.y, rock.x, rock.y);
+            if (U.len(w.x, w.y) < rock.r) {
+              rock.hp -= ms.dmg;
+              if (rock.hp <= 0) this.breakRock(ri, ms.by);
+              this.explode(ms.x, ms.y, ms.dmg * 0.6, 16, ms.by, 'blast');
+              dead = true;
+              break;
+            }
+          }
+        }
         // ships
         if (!dead) {
           for (const s of this.ships) {
@@ -694,6 +807,43 @@
             }
           }
         }
+      }
+
+      // asteroids: drift, wrap, ship collisions
+      for (const rock of this.rocks) {
+        rock.x = U.wrapX(rock.x + rock.vx * dt);
+        rock.y = U.wrapY(rock.y + rock.vy * dt);
+        rock.ang += rock.spin * dt;
+      }
+      for (let ri = this.rocks.length - 1; ri >= 0; ri--) {
+        const rock = this.rocks[ri];
+        // hard rams crack rocks (and hurt the rammer)
+        for (const s of this.ships) {
+          if (s.dead) continue;
+          const w = U.wrapDelta(rock.x, rock.y, s.x, s.y);
+          const d = U.len(w.x, w.y);
+          if (d >= rock.r + s.er) continue;
+          const n = U.norm(w.x, w.y);
+          const spd = U.len(s.vx - rock.vx, s.vy - rock.vy);
+          // separate the ship fully out of the rock
+          s.x = U.wrapX(s.x + n.x * (rock.r + s.er - d + 1));
+          s.y = U.wrapY(s.y + n.y * (rock.r + s.er - d + 1));
+          const vn = (s.vx - rock.vx) * n.x + (s.vy - rock.vy) * n.y;
+          if (vn > 0) {
+            s.vx -= 1.5 * vn * n.x; s.vy -= 1.5 * vn * n.y;
+          }
+          if (spd > 40 && (s.rockT || 0) <= 0) {
+            s.damage(Math.max(1, (spd - 40) * 0.1), null, this, 'crash');
+            s.rockT = 0.5;
+            rock.hp -= 2;
+          }
+          if (rock.hp <= 0) { this.breakRock(ri, null); break; }
+        }
+      }
+      // rings tick
+      for (let i = this.rings.length - 1; i >= 0; i--) {
+        this.rings[i].t += dt;
+        if (this.rings[i].t >= this.rings[i].dur) this.rings.splice(i, 1);
       }
 
       // Chmmr satellites: orbit, zap incoming, ram enemies

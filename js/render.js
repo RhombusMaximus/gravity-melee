@@ -432,6 +432,67 @@
     }
 
     // explosion animations: original SC2 boom sprites
+    // asteroids: procedural rocks, seeded polygon + crater dots
+    if (world.rocks && world.rocks.length) {
+      for (const rock of world.rocks) {
+        const e = U.eff(rock.x, rock.y);
+        if (e.x < -60 || e.x > GM.WV + 60 || e.y < -60 || e.y > GM.WH + 60) continue;
+        const zs = GM.zoomCur;
+        const rr = rock.r * zs;
+        // deterministic 9-gon from the seed
+        const rnd = (() => { let s = rock.seed; return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }; })();
+        g.save();
+        g.translate(e.x, e.y);
+        g.rotate(rock.ang);
+        g.beginPath();
+        for (let k = 0; k < 9; k++) {
+          const a = (k / 9) * U.TAU;
+          const rad = rr * (0.72 + rnd() * 0.4);
+          const px = Math.cos(a) * rad, py = Math.sin(a) * rad;
+          if (k === 0) g.moveTo(px, py); else g.lineTo(px, py);
+        }
+        g.closePath();
+        g.fillStyle = '#5e594e';
+        g.fill();
+        g.strokeStyle = '#3a362e';
+        g.lineWidth = 1;
+        g.stroke();
+        // craters
+        g.fillStyle = '#48443a';
+        for (let k = 0; k < 3; k++) {
+          const cx = (rnd() - 0.5) * rr * 0.7, cy = (rnd() - 0.5) * rr * 0.7;
+          g.beginPath();
+          g.arc(cx, cy, rr * (0.1 + rnd() * 0.14), 0, U.TAU);
+          g.fill();
+        }
+        // sunlit edge
+        g.globalAlpha = 0.25;
+        g.fillStyle = '#9a9282';
+        g.beginPath();
+        g.arc(-rr * 0.3, -rr * 0.3, rr * 0.45, 0, U.TAU);
+        g.fill();
+        g.globalAlpha = 1;
+        g.restore();
+      }
+    }
+
+    // shockwave rings
+    if (world.rings && world.rings.length) {
+      for (const ring of world.rings) {
+        const e = U.eff(ring.x, ring.y);
+        const k = ring.t / ring.dur;
+        const r = (ring.r0 + (ring.r1 - ring.r0) * Math.sqrt(k)) * GM.zoomCur;
+        g.globalAlpha = (1 - k) * 0.8;
+        g.strokeStyle = ring.col;
+        g.lineWidth = ring.w * Math.max(1, GM.zoomCur);
+        g.beginPath();
+        g.arc(e.x, e.y, r, 0, U.TAU);
+        g.stroke();
+      }
+      g.globalAlpha = 1;
+      g.lineWidth = 1;
+    }
+
     if (world.explosions) {
       for (const ex of world.explosions) {
         const e = U.eff(ex.x, ex.y);

@@ -1,6 +1,6 @@
 // gravity-melee :: arena physics constants, teams, ship roster, modes
 (function (GM) {
-  GM.VERSION = '0.43.0';
+  GM.VERSION = '0.44.0';
 
   // The arena is far larger than the 640x360 viewport; the camera follows the
   // player's ship. SCALE multiplies all combat geometry (planet size, ship
@@ -202,8 +202,14 @@
       r: 7, mass: 1.8, accel: 130, turn: 2.0, maxSpeed: 110,
       crew: 30, batt: 10, regen: 2, orbit: 100,
       sprite: 'SHIP:spathi', cap: 'spathi', icon: 'spathi',
-      weapon: { label: 'Front Gun', kind: 'pellet', cd: 0.12, cost: 0.8, speed: 260, dmg: 3, size: 2, life: 0.7, count: 1, spread: 0.03, tol: 0.2, snd: 'pellet' },
-      special: { label: 'B.U.T.T. Missile', type: 'missile', cost: 3, cd: 1.8, speed: 220, dmg: 8, life: 3, turn: 3.0, snd: 'missile' },
+      // SC2 front gun: WEAPON_WAIT 0, cost 2 of 10 battery — a weak rapid
+      // pellet gun like the Stinger's sting (spathi dir has NO gun art, only
+      // the butt frames — wspr:0 opts the tracer in so the front gun stops
+      // firing rotating butt bombs)
+      weapon: { label: 'Front Gun', kind: 'pellet', cd: 0.09, cost: 0.9, speed: 280, dmg: 1, size: 2, life: 0.6, count: 1, spread: 0.03, tol: 0.22, snd: 'pellet', wspr: 0 },
+      // B.U.T.T. (spathi.c): rear-fired homing discriminator, 2 dmg, slow
+      // drift with heat-seeking turn — the tailgater deterrent
+      special: { label: 'B.U.T.T. Missile', type: 'missile', rear: true, cost: 3, cd: 1.2, speed: 110, dmg: 2, life: 1.6, turn: 4.0, snd: 'missile' },
     },
     {
       // ME-20 Trader — the Melnorme merchant (melnorme.c: 20 crew, 42

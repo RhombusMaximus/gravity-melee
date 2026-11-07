@@ -91,6 +91,7 @@
       this.sats = [];      // Chmmr Avatar's orbiting zap satellites
       this.dead = false;
       this.hitT = 0;
+      this.rockT = 0;   // asteroid-ram damage cooldown
       this.thrusting = false;
       this.human = false;
       this.spawnProt = 1.2;
@@ -211,6 +212,7 @@
       this.crashT = Math.max(0, (this.crashT || 0) - dt);
       this.shield = Math.max(0, this.shield - dt);
       this.hitT = Math.max(0, this.hitT - dt);
+      this.rockT = Math.max(0, (this.rockT || 0) - dt);
       this.spawnProt = Math.max(0, this.spawnProt - dt);
       this.batt = Math.min(this.battMax, this.batt + s.regen * dt);
 
@@ -644,9 +646,16 @@
       }
       GM.A.SND.dies();
       world.explosions.push({ x: this.x, y: this.y, t: 0, dur: 0.5, big: true });
+      // v0.44 explosion beauty: double shockwave rings, debris chunks with
+      // gravity, a hot core burst, and the original three particle waves
+      world.ring(this.x, this.y, 130 * S, 0.55, '#ffd9a0', 3);
+      world.ring(this.x, this.y, 210 * S, 0.8, '#ff8a4a', 1.5);
       GM.FX.emit(this.x, this.y, 34, { spd: 120 * S, life: 1.0, col: '#ffd28a', size: 2.5 });
       GM.FX.emit(this.x, this.y, 18, { spd: 60 * S, life: 0.8, col: '#ff7a4a', size: 2 });
       GM.FX.emit(this.x, this.y, 12, { spd: 200 * S, life: 0.5, col: '#fff', size: 1.5 });
+      // debris: dark tumbling chunks that feel like the hull coming apart
+      GM.FX.emit(this.x, this.y, 10, { spd: 90, life: 1.6, col: '#4a4438', size: 3.5, grav: 260, drag: 0.995 });
+      GM.FX.emit(this.x, this.y, 8, { spd: 130, life: 1.3, col: '#7a6a52', size: 2.5, grav: 200, drag: 0.995 });
       GM.FX.float(this.x, this.y - 14, this.name + ' down', '#ffd0a0');
     }
 
